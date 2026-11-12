@@ -2,3 +2,8 @@
   epoch   5  loss 0.00240  AUC 0.9985  (637s)
   epoch  10  loss 0.00279  AUC 0.9998  (1185s)
   epoch  15  loss 0.00183  AUC 0.9991  (1855s)
+  epoch  20  loss 0.00164  AUC 0.9978  (2594s)
+  epoch  25  loss 0.00164  AUC 0.9993  (2821s)
+  epoch  30  loss 0.00167  AUC 0.9970  (3045s)
+  epoch  35  loss 0.00142  AUC 0.9992  (3274s)
+  epoch  40  loss 0.00162  AUC 0.9999  (3475s)

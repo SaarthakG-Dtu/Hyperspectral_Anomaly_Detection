@@ -140,7 +140,9 @@ def fig4_boxplots(res):
                                whiskerprops=dict(color=col, ls="--", lw=1), capprops=dict(color=col, lw=1))
                 bp["boxes"][0].set(facecolor=col, alpha=0.75, edgecolor=col)
         a.set_xticks(range(len(methods)))
-        a.set_xticklabels([m.replace(" ", "\n", 1) for m in methods], fontsize=7)
+        short = {"Spectral only": "Spectral\nonly", "Spatial only": "Spatial\nonly", "Addition fusion": "Addition\nfusion",
+                 "DMS2F-HAD": "DMS2F-\nHAD"}
+        a.set_xticklabels([short.get(m, m) for m in methods], fontsize=6.5)
         a.set_title(DATASETS[d], fontweight="bold")
         a.set_ylim(-0.02, 1.02)
         a.grid(axis="y", alpha=0.3)
@@ -391,6 +393,14 @@ def update_readme(res):
             cells = [(f"**{x:.4f}**" if x == max(a) else f"{x:.4f}") +
                      f" ({PAPER_AUC[d][k if k != 'gated' else 'DMS2F-HAD']:.4f})" for x, (k, _) in zip(a, order)]
             L.append(f"| {DATASETS[d]} | " + " | ".join(cells) + " |")
+        means = [np.mean([float(res[d]["runs"][k]["best_auc"]) for d in rows]) for k, _ in order]
+        pmeans = [np.mean([PAPER_AUC[d][k if k != "gated" else "DMS2F-HAD"] for d in rows]) for k, _ in order]
+        L.append("| **Average** | " + " | ".join((f"**{x:.4f}**" if x == max(means) else f"{x:.4f}") + f" ({p:.4f})"
+                                              for x, p in zip(means, pmeans)) + " |")
+        spread = max(means[1:]) - min(means[1:])
+        L += ["", f"Reading: the spectral branch alone is clearly the weakest variant, as in the paper. Spatial-only, "
+                  f"addition and gated fusion are within {spread:.3f} AUC of each other on average, so with one seed per "
+                  f"run we could not confirm the paper's gain from the gate on these scenes."]
     missing = [f"{DATASETS[d]} / {n}" for d, r in res.items() for k, n in order if k not in r["runs"]]
     if missing:
         L += ["", f"*Not finished or not run yet:* {', '.join(missing)}."]

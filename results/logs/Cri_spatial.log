@@ -1,0 +1,6 @@
+[Cri | spatial] image 400x400x46, 2401 patches, 0.628M params
+  epoch   5  loss 0.00258  AUC 0.9995  (228s)
+  epoch  10  loss 0.00205  AUC 0.9930  (451s)
+  epoch  15  loss 0.00182  AUC 0.9939  (680s)
+  epoch  20  loss 0.00197  AUC 0.9994  (890s)
+  epoch  25  loss 0.00158  AUC 0.9653  (1057s)

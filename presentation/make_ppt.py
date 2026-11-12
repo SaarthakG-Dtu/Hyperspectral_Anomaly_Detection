@@ -621,9 +621,23 @@ if ab_ds:
     rows.append(["Average"] + [f"{x:.4f}  ({p:.4f})" for x, p in zip(m, pm)])
     table(s, rows, 0.6, 1.5, 12.1, [1.6, 1.9, 1.9, 1.9, 1.9], row_h=0.55, size=14, highlight_rows=[len(rows) - 1],
           bold_cells=bold)
+    y_cap = 1.6 + 0.55 * len(rows)
     caption(s, "Our AUC (best epoch), the paper's value in brackets. Bold = best of our four variants for that "
-               "scene. " + ("CRI ablation not run (large image, long training time)." if "Cri" not in ab_ds else ""),
-            y=1.6 + 0.55 * len(rows))
+               "scene." + ("" if "Cri" in ab_ds else "  CRI ablation still training."), y=y_cap)
+    mean_of = dict(zip([k for k, _ in ab], m))
+    box(s, 0.6, y_cap + 0.5, 12.1, 6.85 - (y_cap + 0.5), fill=PANEL)
+    text(s, 0.85, y_cap + 0.62, 11.6, 6.7 - (y_cap + 0.62), [
+        [("Spectral branch alone is the weakest ", {"bold": True}),
+         (f"(mean {mean_of['spectral']:.4f}), as in the paper: one pooled spectrum per patch cannot localise small "
+          "targets.", {})],
+        [("Adding the spatial branch is what matters. ", {"bold": True}),
+         (f"Spatial only {mean_of['spatial']:.4f}, addition {mean_of['add']:.4f}, gated {mean_of['gated']:.4f}: "
+          f"within {max(mean_of['spatial'], mean_of['add'], mean_of['gated']) - min(mean_of['spatial'], mean_of['add'], mean_of['gated']):.3f} "
+          "of each other.", {})],
+        [("Gate vs. addition: ", {"bold": True}),
+         ("on these scenes, with one seed, we could not confirm the paper's gain from gated fusion; the difference is "
+          "within run-to-run noise.", {})],
+    ], size=14, bullets=True, space_after=6)
 else:
     text(s, 0.6, 2.0, 12, 1, "Ablation runs not finished yet.", size=18, color=MUTED)
 
@@ -653,7 +667,8 @@ cols = [("What DMS2F-HAD does", [
         ("What we reproduced", [
             f"Mean AUC {avg_best:.4f} (best epoch) vs {avg_paper:.4f} in the paper on the same {len(GATED)} scenes.",
             f"RX baseline matches the paper exactly (mean {avg_rx:.4f}).",
-            f"Full-image inference in {avg_time:.2f} s on a shared GPU."]),
+            "Ablation: spectral-only is clearly weakest, as in the paper; gated vs. addition fusion is within noise.",
+            f"Full-image inference in {avg_time:.2f} s."]),
         ("Limits of this study", [
             "4 of the paper's 14 scenes (the ones released with the code); one random seed.",
             "Best-epoch numbers use the ground truth to pick the checkpoint, as the paper does.",
@@ -665,8 +680,9 @@ for i, (h, pts) in enumerate(cols):
     text(s, x + 0.9, 1.75, 2.9, 0.6, h, size=18, font=HEAD, bold=True, color=WHITE)
     text(s, x + 0.25, 2.5, 3.45, 3.2, pts, size=14, color="DCE3EE", bullets=True, space_after=10)
 text(s, 0.6, 6.1, 12.1, 0.8, [[("Bottom line: ", {"bold": True, "color": AMBER}),
-     ("a small dual-branch Mamba autoencoder reproduces the paper's accuracy level on the released scenes; "
-      "the open problem is choosing the checkpoint without labels.", {})]], size=16, color=WHITE)
+     (f"a 0.65 M-parameter dual-branch Mamba autoencoder gets close to the paper (mean AUC {avg_best:.4f} vs "
+      f"{avg_paper:.4f}) on the released scenes; the open problem is choosing the checkpoint without labels.", {})]],
+     size=16, color=WHITE)
 
 prs.save(OUT)
 print("saved", OUT, "with", len(prs.slides), "slides")

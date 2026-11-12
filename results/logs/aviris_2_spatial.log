@@ -13,3 +13,10 @@
   epoch  60  loss 0.00284  AUC 0.8309  (558s)
   epoch  65  loss 0.00335  AUC 0.9534  (602s)
   epoch  70  loss 0.00482  AUC 0.9264  (722s)
+  epoch  75  loss 0.00324  AUC 0.9639  (949s)
+  epoch  80  loss 0.00248  AUC 0.8169  (1072s)
+  epoch  85  loss 0.00329  AUC 0.9569  (1100s)
+  epoch  90  loss 0.00289  AUC 0.7452  (1124s)
+  epoch  95  loss 0.00270  AUC 0.9194  (1142s)
+  epoch 100  loss 0.00508  AUC 0.9316  (1166s)
+[aviris_2 | spatial] final AUC 0.9316 | best AUC 0.9639 (epoch 75) | inference 0.385s -> E:\HAD Project\results\runs\aviris_2_spatial.npz
