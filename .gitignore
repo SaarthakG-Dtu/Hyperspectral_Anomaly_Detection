@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+# the paper PDF is not redistributed; see the link in README
+paper/
+# PowerPoint lock files
+presentation/~$*

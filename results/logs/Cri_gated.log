@@ -1,0 +1,4 @@
+[Cri | gated] image 400x400x46, 2401 patches, 0.628M params
+  epoch   5  loss 0.00240  AUC 0.9985  (637s)
+  epoch  10  loss 0.00279  AUC 0.9998  (1185s)
+  epoch  15  loss 0.00183  AUC 0.9991  (1855s)

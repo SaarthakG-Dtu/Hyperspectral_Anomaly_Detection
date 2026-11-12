@@ -1,0 +1,4 @@
+dataset,rx_auc,rx_auc_paper,dms2f_best_auc,dms2f_final_auc,best_epoch,dms2f_auc_paper,infer_time_s,params
+aviris_1,0.8866,0.8866,0.9871,0.9597,35,0.9891,0.140,646858
+aviris_2,0.9181,0.9181,0.9639,0.9250,60,0.9851,0.309,646858
+San_Diego,0.9403,0.9403,0.9876,0.9707,25,0.9722,0.182,646858

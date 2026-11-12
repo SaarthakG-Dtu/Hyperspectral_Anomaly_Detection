@@ -1,0 +1,10 @@
+[San_Diego | add] image 100x100x189, 144 patches, 0.647M params
+  epoch   5  loss 0.02815  AUC 0.8923  (84s)
+  epoch  10  loss 0.00814  AUC 0.9659  (118s)
+  epoch  15  loss 0.00638  AUC 0.9882  (150s)
+  epoch  20  loss 0.00520  AUC 0.9826  (182s)
+  epoch  25  loss 0.00586  AUC 0.9836  (205s)
+  epoch  30  loss 0.00510  AUC 0.9339  (226s)
+  epoch  35  loss 0.00400  AUC 0.9869  (248s)
+  epoch  40  loss 0.00365  AUC 0.9851  (294s)
+  epoch  45  loss 0.00303  AUC 0.9862  (327s)

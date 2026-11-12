@@ -1,0 +1,8 @@
+[aviris_1 | add] image 100x100x189, 144 patches, 0.647M params
+  epoch   5  loss 0.03545  AUC 0.8596  (108s)
+  epoch  10  loss 0.00757  AUC 0.9841  (132s)
+  epoch  15  loss 0.00930  AUC 0.9824  (157s)
+  epoch  20  loss 0.00890  AUC 0.9829  (177s)
+  epoch  25  loss 0.00468  AUC 0.9852  (200s)
+  epoch  30  loss 0.00441  AUC 0.9848  (243s)
+  epoch  35  loss 0.00428  AUC 0.9857  (281s)

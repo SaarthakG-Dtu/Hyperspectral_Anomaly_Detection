@@ -1,0 +1,8 @@
+torch>=2.1
+numpy
+scipy
+scikit-learn
+matplotlib
+pillow
+python-pptx      # only for presentation/make_ppt.py
+pymupdf          # only to crop the paper figure for the slides
