@@ -91,3 +91,12 @@
   epoch  90  loss 0.00303  AUC 0.8134  (446s)
   epoch  91  loss 0.00404  AUC 0.8506  (450s)
   epoch  92  loss 0.00329  AUC 0.8615  (455s)
+  epoch  93  loss 0.00287  AUC 0.7782  (459s)
+  epoch  94  loss 0.00502  AUC 0.9528  (464s)
+  epoch  95  loss 0.00330  AUC 0.9246  (469s)
+  epoch  96  loss 0.00324  AUC 0.9551  (473s)
+  epoch  97  loss 0.00379  AUC 0.8721  (478s)
+  epoch  98  loss 0.00323  AUC 0.9031  (482s)
+  epoch  99  loss 0.00339  AUC 0.8590  (487s)
+  epoch 100  loss 0.00374  AUC 0.7032  (491s)
+[aviris_2 | gated] final AUC 0.7032 | best AUC 0.9726 (epoch 49) | inference 0.413s -> E:\HAD Project\results\runs\extra\aviris_2_gated_every1_s1.npz

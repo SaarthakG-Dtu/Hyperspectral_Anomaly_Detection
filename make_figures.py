@@ -467,8 +467,9 @@ def update_readme(res):
         L.append(f"| **Mean** | {np.mean(cols['paper']):.4f} | {np.mean(cols['main']):.4f} | "
                  + (f"{np.mean(cols['e1']):.4f} (mean of seeds)" if len(cols["e1"]) == n else "–")
                  + (f" | {np.mean(cols['off']):.4f} |" if len(cols["off"]) == n else " | – |"))
+        L.append("")
         if len(cols["e1"]) == n:
-            L += ["", f"* Across three seeds, the best AUC of one scene varies by up to {max(spreads):.3f}, so "
+            L += [f"* Across three seeds, the best AUC of one scene varies by up to {max(spreads):.3f}, so "
                       f"differences of this size between single runs are run-to-run noise.",
                   f"* Checking the AUC every epoch instead of every five epochs changes the mean of seed 0 from "
                   f"{np.mean(cols['main']):.4f} to {np.mean([extra_auc(d, 'every1_s0') for d in eds]):.4f}."]
@@ -480,6 +481,16 @@ def update_readme(res):
             L.append(f"* With the official code's settings the mean is {np.mean(cols['off']):.4f}, against "
                      f"{np.mean(cols['paper']):.4f} in the paper and {np.mean(cols['main']):.4f} for our main run, "
                      f"{verdict}.")
+        L.append("* The released code cannot run as published (it imports two files that are not in the repository, "
+                 "and its Mamba library is Linux-only), and the settings and seed behind each number in the paper are "
+                 "not documented.")
+        for d in eds:
+            ours = [float(res[d]["runs"]["gated"]["best_auc"])] + [v for v in
+                    [extra_auc(d, f"every1_s{k}") for k in range(3)] + [extra_auc(d, "official")] if v is not None]
+            if max(ours) < PAPER_AUC[d]["DMS2F-HAD"] - 0.005:
+                L.append(f"* **{DATASETS[d]} is not reproduced:** all {len(ours)} of our runs give "
+                         f"{min(ours):.4f}–{max(ours):.4f}, against {PAPER_AUC[d]['DMS2F-HAD']:.4f} in the paper. The "
+                         f"other scenes match or exceed the paper.")
     missing = [f"{DATASETS[d]} / {n}" for d, r in res.items() for k, n in order if k not in r["runs"]]
     if missing:
         L += ["", f"*Not finished or not run yet:* {', '.join(missing)}."]

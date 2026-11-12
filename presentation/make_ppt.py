@@ -711,24 +711,28 @@ if ab_ds:
 else:
     text(s, 0.6, 2.0, 12, 1, "The ablation runs have not finished yet.", size=18, color=MUTED)
 
-# ================================================================= 14. why numbers differ
+# ================================================================= 14. why results differ
 s = new_slide(notes=(
-    "Our numbers are close to the paper's but not identical. The architecture, loss, data and scoring rule are the "
-    "same, but several details differ between the paper text, the official code and our version. I tested the ones "
-    "that could matter: how often the checkpoint is checked, the random seed, and the official code's settings."))
-title(s, "Why our numbers differ from the paper")
-diffs = [["Aspect", "Official code", "Our version"],
-         ["Mamba state size", "64", "16"],
-         ["Spatial convolutions", "3×3 only", "3×3 + 5×5 (paper text)"],
-         ["Band groups", "12 bands, stride 6", "16, stride 8 (paper text)"],
-         ["Epochs; AUC checked", "150; every epoch", "100; every 5 epochs"],
-         ["Model state at test", "training mode", "evaluation mode"],
-         ["Masking", "fixed 3×3 square", "random 2–5 px box"]]
-table(s, diffs, 0.6, 1.35, 5.75, [1.9, 1.75, 2.1], row_h=0.42, size=12)
-text(s, 0.6, 4.35, 5.75, 0.4, "Unchanged: architecture, loss, data, normalisation and anomaly score.", size=13,
-     bold=True, color=TEAL)
+    "We follow the paper's text, and the method is the same; our PyTorch Mamba scan gives the same numbers as the CUDA "
+    "kernel. The remaining differences come from three sources: which checkpoint is reported while the AUC swings, "
+    "random seeds, and settings that differ between the paper text and the released code or are not recorded at all. "
+    "I tested each of them with extra runs on the three AVIRIS scenes."))
+title(s, "Why our results differ from the paper")
+box(s, 0.6, 1.3, 12.15, 0.68, fill=INK)
+text(s, 0.85, 1.33, 11.7, 0.62, [[("We follow the paper's text. ", {"bold": True, "color": AMBER}),
+     ("The method is the same as in the paper, and our PyTorch Mamba scan matches the CUDA kernel to within 10⁻¹⁵. "
+      "The differences come from settings, randomness and details the paper does not record.", {})]],
+     size=13, color=WHITE, anchor=MSO_ANCHOR.MIDDLE)
+diffs = [["Aspect", "Paper text (our version)", "Official code"],
+         ["Mamba state size", "not stated (we use 16)", "64"],
+         ["Spatial convolutions", "3×3 and 5×5", "3×3 only"],
+         ["Band groups", "16 bands, stride 8", "12 bands, stride 6"],
+         ["Epochs", "100", "150"],
+         ["AUC checked for best epoch", "not stated (we: every 5)", "every epoch"],
+         ["Model state when scoring", "not stated (we: evaluation)", "training mode"]]
+table(s, diffs, 0.6, 2.15, 5.85, [2.0, 2.15, 1.7], row_h=0.38, size=12)
 hdr = ["Scene", "Paper", "Our main\nrun", "Every epoch\n(3 seeds)", "Official\nsettings"]
-rows, have = [hdr], {"main": [], "e1": [], "off": [], "paper": []}
+rows, have, ranges = [hdr], {"main": [], "e1": [], "off": [], "paper": []}, {}
 for d in EXTRA_DS:
     e1 = [v for v in X[d]["e1"] if v is not None]
     off = X[d]["official"]
@@ -741,29 +745,36 @@ for d in EXTRA_DS:
         have["e1"].append(np.mean(e1))
     if off is not None:
         have["off"].append(off)
+    ours_all = [X[d]["main"]] + e1 + ([off] if off is not None else [])
+    ranges[d] = (min(ours_all), max(ours_all))
 full = lambda k: len(have[k]) == len(EXTRA_DS)
 rows.append(["Mean", f"{np.mean(have['paper']):.4f}", f"{np.mean(have['main']):.4f}",
              f"{np.mean(have['e1']):.4f}" if full("e1") else "–", f"{np.mean(have['off']):.4f}" if full("off") else "–"])
-table(s, rows, 6.6, 1.35, 6.15, [1.3, 0.95, 1.05, 1.7, 1.15], row_h=0.5, size=13, highlight_rows=[len(rows) - 1])
-caption(s, "Best-epoch AUC on the three AVIRIS scenes; '±' is half the range over seeds 0, 1 and 2.", y=4.4,
-        x=6.6, w=6.15)
-find = [f"During training the AUC of a scene swings by up to {swing:.2f} between checkpoints while the loss keeps "
-        "falling, so the reported number depends on which checkpoint is kept."]
+table(s, rows, 6.65, 2.15, 6.1, [1.3, 0.95, 1.05, 1.7, 1.1], row_h=0.46, size=13, highlight_rows=[len(rows) - 1])
+caption(s, "Best-epoch AUC on the AVIRIS scenes; '±' is half the range over seeds 0, 1 and 2.", y=4.55, x=6.65,
+        w=6.1)
+r1 = (f"Checkpoint choice: the AUC swings by up to {swing:.2f} between checkpoints, and the paper reports the best one, "
+      "so how often it is checked matters")
+r1 += (f"; checking every epoch moves our mean from {np.mean(have['main']):.4f} to {np.mean(have['e1']):.4f}."
+       if full("e1") else ".")
+reasons = [r1]
 if full("e1"):
-    find.append(f"Across three random seeds the best AUC of a scene varies by up to {max(seed_spread):.3f}; checking "
-                f"every epoch instead of every five moves the mean from {np.mean(have['main']):.4f} to "
-                f"{np.mean(have['e1']):.4f}.")
+    reasons.append(f"Randomness: with three seeds, the best AUC of one scene varies by up to {max(seed_spread):.3f}.")
 if full("off"):
     gap = np.mean(have["off"]) - np.mean(have["main"])
-    verdict = ("so these settings explain part of the gap." if gap > 0.003 else
-               "so these settings do not explain the gap." if gap > -0.003 else
-               "so these settings do not help in our runs.")
-    find.append(f"With the official code's settings the mean is {np.mean(have['off']):.4f} against "
-                f"{np.mean(have['paper']):.4f} in the paper, {verdict}")
-if len(find) == 1:
-    find.append("The test runs are still training; this slide fills in automatically when they finish.")
+    verdict = ("which explains part of the gap." if gap > 0.003 else "which does not explain the gap." if gap > -0.003
+               else "which does not help in our runs.")
+    reasons.append(f"Settings: the official code's settings give a mean of {np.mean(have['off']):.4f} against "
+                   f"{np.mean(have['paper']):.4f} in the paper, {verdict}")
+missed = [d for d in EXTRA_DS if ranges[d][1] < PAPER_AUC[d]["DMS2F-HAD"] - 0.005]
+r4 = ("Not recorded: the released code cannot run as published (two files are missing and its Mamba library is "
+      "Linux-only), and the settings and seed behind each paper number are not documented.")
+for d in missed:
+    r4 += (f" {DATASETS[d]} is not reproduced: all our runs give {ranges[d][0]:.4f}–{ranges[d][1]:.4f} against "
+           f"{PAPER_AUC[d]['DMS2F-HAD']:.4f}.")
+reasons.append(r4)
 box(s, 0.6, 4.95, 12.15, 1.95, fill=PANEL)
-text(s, 0.85, 5.02, 11.7, 1.85, find, size=13, bullets=True, space_after=3)
+text(s, 0.85, 5.0, 11.7, 1.88, reasons, size=13, bullets=True, space_after=2)
 
 # ================================================================= 15. takeaways
 s = new_slide(dark=True, notes=(

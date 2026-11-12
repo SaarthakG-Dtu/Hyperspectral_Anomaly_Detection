@@ -123,10 +123,13 @@ Reading: the spectral branch alone is clearly the weakest variant, as in the pap
 
 | Scene | Paper | Our main run | AUC checked every epoch, seeds 0 / 1 / 2 | Official settings |
 |---|---|---|---|---|
-| AVIRIS-1 | 0.9891 | 0.9871 | 0.9905 / running / running | running |
-| AVIRIS-2 | 0.9851 | 0.9639 | 0.9700 / running / running | running |
-| San Diego | 0.9722 | 0.9876 | 0.9892 / running / running | running |
+| AVIRIS-1 | 0.9891 | 0.9871 | 0.9905 / 0.9881 / running | running |
+| AVIRIS-2 | 0.9851 | 0.9639 | 0.9700 / 0.9726 / running | 0.9715 |
+| San Diego | 0.9722 | 0.9876 | 0.9892 / 0.9894 / running | running |
 | **Mean** | 0.9821 | 0.9795 | – | – |
+
+* The released code cannot run as published (it imports two files that are not in the repository, and its Mamba library is Linux-only), and the settings and seed behind each number in the paper are not documented.
+* **AVIRIS-2 is not reproduced:** all 4 of our runs give 0.9639–0.9726, against 0.9851 in the paper. The other scenes match or exceed the paper.
 <!-- RESULTS END -->
 
 **About "best epoch" vs. "epoch 100".** The paper reports "the model with the best validation performance", and
@@ -209,9 +212,13 @@ python presentation/make_ppt.py                      # rebuild the slide deck
 
 ## 7. Differences from the paper and the official code
 
-The architecture, the loss, the data, the normalisation and the anomaly score are the same as in the paper. The
-goal was the simplest faithful version of the paper, so where the paper text and the official code differ, we
-followed the paper text. The remaining differences are listed below.
+**We follow the paper's text.** The architecture, the loss, the data, the normalisation and the anomaly score are
+the same as in the paper, and where the paper text and the official code differ, we followed the paper text. The
+official code could not serve as a direct reference: as released it imports two files that are not in the repository
+(`src/project_paths.py` and `src/auc_tracker_abalation.py`), and its Mamba library (`mamba_ssm`) ships compiled CUDA
+kernels for Linux only. Replacing that kernel does not change the results: our plain-PyTorch scan matches the
+step-by-step recurrence to within 10⁻¹⁵. The remaining differences are listed below; their effect on the results is
+measured in the results section under "Why our numbers differ from the paper".
 
 | | Official code | This implementation |
 |---|---|---|
