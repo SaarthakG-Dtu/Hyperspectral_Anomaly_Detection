@@ -80,11 +80,11 @@ without labels; the ground truth is used only for evaluation. Model size: **0.64
 <!-- RESULTS START -->
 | Scene | RX (ours / paper) | DMS2F-HAD ours, best epoch | DMS2F-HAD ours, epoch 100 | DMS2F-HAD paper | Inference (s) |
 |---|---|---|---|---|---|
-| CRI | 0.9990 / 0.9989 | *training* | *training* | 0.9999 | – |
+| CRI | 0.9990 / 0.9989 | **0.9999** (epoch 50) | 0.9987 | 0.9999 | 2.054 |
 | AVIRIS-1 | 0.8866 / 0.8866 | **0.9871** (epoch 35) | 0.9597 | 0.9891 | 0.140 |
 | AVIRIS-2 | 0.9181 / 0.9181 | **0.9639** (epoch 60) | 0.9250 | 0.9851 | 0.309 |
 | San Diego | 0.9403 / 0.9403 | **0.9876** (epoch 25) | 0.9707 | 0.9722 | 0.182 |
-| **Average (3 scenes)** | 0.9150 | **0.9795** | 0.9518 | 0.9821 | |
+| **Average (4 scenes)** | 0.9360 | **0.9846** | 0.9635 | 0.9866 | |
 
 **Ablation** (paper Table 5) — our AUC at the best epoch, paper value in brackets:
 
@@ -97,7 +97,7 @@ without labels; the ground truth is used only for evaluation. Model size: **0.64
 
 Reading: the spectral branch alone is clearly the weakest variant, as in the paper. Spatial-only, addition and gated fusion are within 0.002 AUC of each other on average, so with one seed per run we could not confirm the paper's gain from the gate on these scenes.
 
-*Not finished or not run yet:* CRI / Spectral only, CRI / Spatial only, CRI / Addition fusion, CRI / Gated fusion (full).
+*Not finished or not run yet:* CRI / Spectral only, CRI / Spatial only, CRI / Addition fusion.
 <!-- RESULTS END -->
 
 **About "best epoch" vs. "epoch 100".** The paper reports "the model with the best validation performance", and

@@ -13,3 +13,10 @@
   epoch  60  loss 0.00148  AUC 0.9996  (4118s)
   epoch  65  loss 0.00155  AUC 0.9674  (4289s)
   epoch  70  loss 0.00137  AUC 0.9999  (4461s)
+  epoch  75  loss 0.00166  AUC 0.9818  (4622s)
+  epoch  80  loss 0.00153  AUC 0.9988  (4777s)
+  epoch  85  loss 0.00154  AUC 0.9997  (4932s)
+  epoch  90  loss 0.00161  AUC 0.9993  (5087s)
+  epoch  95  loss 0.00152  AUC 0.9999  (5241s)
+  epoch 100  loss 0.00151  AUC 0.9987  (5396s)
+[Cri | gated] final AUC 0.9987 | best AUC 0.9999 (epoch 50) | inference 2.054s -> E:\HAD Project\results\runs\Cri_gated.npz
