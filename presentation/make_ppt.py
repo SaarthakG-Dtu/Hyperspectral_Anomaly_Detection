@@ -792,7 +792,9 @@ cols = [("What the method does", [
         ("Limits of this study", [
             "We used 4 of the paper's 14 scenes, because only these are released.",
             "The best-epoch numbers use the ground truth to choose the checkpoint, as the paper does.",
-            "The baseline numbers are the paper's; we only re-ran RX."]),
+            "The baseline numbers are the paper's; we only re-ran RX."]
+            + [f"{DATASETS[d]} is not reproduced ({ranges[d][0]:.3f}–{ranges[d][1]:.3f} against "
+               f"{PAPER_AUC[d]['DMS2F-HAD']:.3f})." for d in missed]),
         ("Next steps", [
             "Choose the checkpoint without labels, e.g. by early stopping on the reconstruction loss.",
             "Run the other ten scenes with several seeds.",

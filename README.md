@@ -123,13 +123,16 @@ Reading: the spectral branch alone is clearly the weakest variant, as in the pap
 
 | Scene | Paper | Our main run | AUC checked every epoch, seeds 0 / 1 / 2 | Official settings |
 |---|---|---|---|---|
-| AVIRIS-1 | 0.9891 | 0.9871 | 0.9905 / 0.9881 / running | running |
-| AVIRIS-2 | 0.9851 | 0.9639 | 0.9700 / 0.9726 / running | 0.9715 |
-| San Diego | 0.9722 | 0.9876 | 0.9892 / 0.9894 / running | running |
-| **Mean** | 0.9821 | 0.9795 | – | – |
+| AVIRIS-1 | 0.9891 | 0.9871 | 0.9905 / 0.9881 / 0.9920 | 0.9894 |
+| AVIRIS-2 | 0.9851 | 0.9639 | 0.9700 / 0.9726 / 0.9632 | 0.9715 |
+| San Diego | 0.9722 | 0.9876 | 0.9892 / 0.9894 / 0.9889 | 0.9895 |
+| **Mean** | 0.9821 | 0.9795 | 0.9826 (mean of seeds) | 0.9835 |
 
+* Across three seeds, the best AUC of one scene varies by up to 0.009, so differences of this size between single runs are run-to-run noise.
+* Checking the AUC every epoch instead of every five epochs changes the mean of seed 0 from 0.9795 to 0.9832.
+* With the official code's settings the mean is 0.9835, against 0.9821 in the paper and 0.9795 for our main run, so these settings explain part of the gap.
 * The released code cannot run as published (it imports two files that are not in the repository, and its Mamba library is Linux-only), and the settings and seed behind each number in the paper are not documented.
-* **AVIRIS-2 is not reproduced:** all 4 of our runs give 0.9639–0.9726, against 0.9851 in the paper. The other scenes match or exceed the paper.
+* **AVIRIS-2 is not reproduced:** all 5 of our runs give 0.9632–0.9726, against 0.9851 in the paper. The other scenes match or exceed the paper.
 <!-- RESULTS END -->
 
 **About "best epoch" vs. "epoch 100".** The paper reports "the model with the best validation performance", and
