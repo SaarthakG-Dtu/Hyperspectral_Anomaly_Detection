@@ -34,7 +34,12 @@ def detect(model, patches, H, W, cube_t, batch=64):
     return torch.linalg.norm(cube_t - recon, dim=0).numpy()          # Eq. (2)
 
 
-def train(dataset, fusion="gated", epochs=100, batch=32, lr=5e-4, wd=1e-4, eval_every=5, seed=0):
+# Settings of the official code (github.com/Ayushma00/DMS2F-HAD), where they differ from the paper text
+OFFICIAL = dict(d_state=64, conv5=False, group_size=12, group_stride=6, epochs=150, eval_every=1)
+
+
+def train(dataset, fusion="gated", epochs=100, batch=32, lr=5e-4, wd=1e-4, eval_every=5, seed=0,
+          d_state=16, conv5=True, group_size=16, group_stride=8, tag=None):
     random.seed(seed); np.random.seed(seed); torch.manual_seed(seed)
     dev = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -42,7 +47,8 @@ def train(dataset, fusion="gated", epochs=100, batch=32, lr=5e-4, wd=1e-4, eval_
     H, W, C = cube.shape
     cube_t = torch.from_numpy(cube).permute(2, 0, 1)
     patches = extract_patches(cube).to(dev)
-    model = DMS2FHAD(C, fusion=fusion).to(dev)
+    model = DMS2FHAD(C, fusion=fusion, d_state=d_state, conv5=conv5, group_size=group_size,
+                     group_stride=group_stride).to(dev)
     n_params = sum(p.numel() for p in model.parameters())
     opt = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=wd)
     print(f"[{dataset} | {fusion}] image {H}x{W}x{C}, {len(patches)} patches, {n_params/1e6:.3f}M params", flush=True)
@@ -80,8 +86,9 @@ def train(dataset, fusion="gated", epochs=100, batch=32, lr=5e-4, wd=1e-4, eval_
         torch.cuda.synchronize()
     infer_time = time.time() - t1
 
-    RUN_DIR.mkdir(parents=True, exist_ok=True)
-    out = RUN_DIR / f"{dataset}_{fusion}.npz"
+    out_dir = RUN_DIR / "extra" if tag else RUN_DIR      # extra experiments are kept apart
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / f"{dataset}_{fusion}{'_' + tag if tag else ''}.npz"
     np.savez_compressed(
         out, final_map=final_map, best_map=best["map"], gt=gt,
         final_auc=auc_score(final_map, gt), best_auc=best["auc"], best_epoch=best["epoch"],
@@ -98,9 +105,18 @@ if __name__ == "__main__":
     p.add_argument("--fusion", default="gated", help="gated | add | spatial | spectral | all")
     p.add_argument("--epochs", type=int, default=100)
     p.add_argument("--batch", type=int, default=32)
+    p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--eval_every", type=int, default=5, help="evaluate AUC every N epochs")
+    p.add_argument("--official", action="store_true",
+                   help="use the official code's settings: Mamba state 64, 3x3 conv only, 12-band groups, "
+                        "150 epochs, AUC checked every epoch")
+    p.add_argument("--tag", default=None, help="name suffix; tagged runs go to results/runs/extra/")
     a = p.parse_args()
     datasets = list(DATASETS) if a.dataset == "all" else [a.dataset]
     fusions = ["gated", "add", "spatial", "spectral"] if a.fusion == "all" else [a.fusion]
+    kw = dict(epochs=a.epochs, eval_every=a.eval_every)
+    if a.official:
+        kw.update(OFFICIAL)
     for d in datasets:
         for f in fusions:
-            train(d, f, epochs=a.epochs, batch=a.batch)
+            train(d, f, batch=a.batch, seed=a.seed, tag=a.tag, **kw)

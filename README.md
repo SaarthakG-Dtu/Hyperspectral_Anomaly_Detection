@@ -97,7 +97,7 @@ without labels; the ground truth is used only for evaluation. Model size: **0.64
 
 Reading: the spectral branch alone is clearly the weakest variant, as in the paper. Spatial-only, addition and gated fusion are within 0.002 AUC of each other on average, so with one seed per run we could not confirm the paper's gain from the gate on these scenes.
 
-*Not finished or not run yet:* CRI / Spectral only, CRI / Spatial only, CRI / Addition fusion.
+*Not finished or not run yet:* CRI / Addition fusion.
 <!-- RESULTS END -->
 
 **About "best epoch" vs. "epoch 100".** The paper reports "the model with the best validation performance", and
@@ -178,24 +178,35 @@ python presentation/make_ppt.py                      # rebuild the slide deck
 
 `--dataset` is one of `Cri`, `aviris_1`, `aviris_2`, `San_Diego`, `all`. A GPU is recommended; CPU works but is slow.
 
-## 7. Differences from the official code
+## 7. Differences from the paper and the official code
 
-The goal was the simplest faithful version of the paper. Where the paper text and the official code differ, we
-follow the paper.
+The architecture, the loss, the data, the normalisation and the anomaly score are the same as in the paper. The
+goal was the simplest faithful version of the paper, so where the paper text and the official code differ, we
+followed the paper text. The remaining differences are listed below.
 
 | | Official code | This implementation |
 |---|---|---|
 | Mamba | `mamba_ssm` CUDA kernels (Linux only) | plain PyTorch; exact two-level chunked selective scan (16 + 16 steps instead of 256) |
-| Mamba state size | 64 | 16 — gives the paper's 0.64 M parameters |
-| Spatial multi-scale conv | 3×3 only (5×5 commented out) | 3×3 and 5×5 in parallel, as in the paper |
-| Band groups | 12 bands, stride 6 | c2 = 16, k = 8, as in the paper (Sec. 4.3) |
+| Mamba state size | 64 | 16 |
+| Spatial multi-scale conv | 3×3 only (5×5 commented out) | 3×3 and 5×5 in parallel, as in the paper text |
+| Band groups | 12 bands, stride 6 | c2 = 16, k = 8, as in the paper text (Sec. 4.3) |
+| Epochs and checkpoint checks | 150 epochs, AUC checked every epoch | 100 epochs (paper text), AUC checked every 5 epochs |
 | Masking | per batch, fixed 3×3 square | per sample, random 2–5 px rectangle |
 | Evaluation | model left in training mode | `model.eval()` (no masking or dropout at test time) |
-| Checkpoint selection | best AUC, every epoch | best AUC, every 5 epochs; final epoch also reported |
+
+**Parameter count.** Rebuilding the official model's layer shapes gives exactly **0.640 M** used parameters with
+Mamba state size 64, which is the number in the paper. Our model has 0.647 M parameters with state size 16; the
+similar total is a coincidence, because our 5×5 convolution and band groups add parameters that the smaller state
+removes.
+
+`python train.py --dataset aviris_2 --official` trains with the official code's settings (state size 64, 3×3 conv
+only, 12-band groups, 150 epochs, AUC checked every epoch), so the two versions can be compared directly. The test
+runs that do this are summarised in the results section under "Why our numbers differ from the paper".
 
 ## 8. Limitations
 
-* Four of the paper's fourteen scenes (only these are released), one random seed per run.
+* Four of the paper's fourteen scenes (only these are released). The main results are single runs (seed 0);
+  three seeds were run on the AVIRIS scenes to measure the run-to-run variation.
 * "Best epoch" AUC uses the ground truth to pick the checkpoint, as in the paper; the "epoch 100" column is the
   label-free number.
 * The pure-PyTorch scan trains slower than the fused CUDA kernels (inference is still well under a second).

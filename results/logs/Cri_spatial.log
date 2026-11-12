@@ -16,3 +16,7 @@
   epoch  75  loss 0.00144  AUC 0.9991  (2614s)
   epoch  80  loss 0.00156  AUC 0.9958  (2765s)
   epoch  85  loss 0.00150  AUC 0.9917  (2883s)
+  epoch  90  loss 0.00135  AUC 0.9999  (2966s)
+  epoch  95  loss 0.00142  AUC 0.9990  (3044s)
+  epoch 100  loss 0.00147  AUC 0.9998  (3122s)
+[Cri | spatial] final AUC 0.9998 | best AUC 0.9999 (epoch 90) | inference 1.308s -> E:\HAD Project\results\runs\Cri_spatial.npz

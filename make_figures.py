@@ -426,6 +426,48 @@ def update_readme(res):
         L += ["", f"Reading: the spectral branch alone is clearly the weakest variant, as in the paper. Spatial-only, "
                   f"addition and gated fusion are within {spread:.3f} AUC of each other on average, so with one seed per "
                   f"run we could not confirm the paper's gain from the gate on these scenes."]
+    # ---- test runs that explain the gap to the paper (results/runs/extra)
+    def extra_auc(d, tag):
+        p = RUNS / "extra" / f"{d}_gated_{tag}.npz"
+        return float(np.load(p)["best_auc"]) if p.exists() else None
+    eds = ["aviris_1", "aviris_2", "San_Diego"]
+    if (RUNS / "extra").exists():
+        L += ["", "**Why our numbers differ from the paper.** Best-epoch AUC of extra test runs on the three AVIRIS "
+                  "scenes: the main run, the same settings with the AUC checked every epoch for seeds 0, 1 and 2, and "
+                  "the official code's settings (`--official`).", "",
+              "| Scene | Paper | Our main run | AUC checked every epoch, seeds 0 / 1 / 2 | Official settings |",
+              "|---|---|---|---|---|"]
+        cols = {"paper": [], "main": [], "e1": [], "off": []}
+        spreads = []
+        for d in eds:
+            e1 = [extra_auc(d, f"every1_s{k}") for k in range(3)]
+            off = extra_auc(d, "official")
+            main = float(res[d]["runs"]["gated"]["best_auc"])
+            e1s = " / ".join(f"{v:.4f}" if v is not None else "running" for v in e1)
+            offs = f"{off:.4f}" if off is not None else "running"
+            L.append(f"| {DATASETS[d]} | {PAPER_AUC[d]['DMS2F-HAD']:.4f} | {main:.4f} | {e1s} | {offs} |")
+            cols["paper"].append(PAPER_AUC[d]["DMS2F-HAD"]); cols["main"].append(main)
+            if all(v is not None for v in e1):
+                cols["e1"].append(np.mean(e1)); spreads.append(max(e1) - min(e1))
+            if off is not None:
+                cols["off"].append(off)
+        n = len(eds)
+        L.append(f"| **Mean** | {np.mean(cols['paper']):.4f} | {np.mean(cols['main']):.4f} | "
+                 + (f"{np.mean(cols['e1']):.4f} (mean of seeds)" if len(cols["e1"]) == n else "–")
+                 + (f" | {np.mean(cols['off']):.4f} |" if len(cols["off"]) == n else " | – |"))
+        if len(cols["e1"]) == n:
+            L += ["", f"* Across three seeds, the best AUC of one scene varies by up to {max(spreads):.3f}, so "
+                      f"differences of this size between single runs are run-to-run noise.",
+                  f"* Checking the AUC every epoch instead of every five epochs changes the mean of seed 0 from "
+                  f"{np.mean(cols['main']):.4f} to {np.mean([extra_auc(d, 'every1_s0') for d in eds]):.4f}."]
+        if len(cols["off"]) == n:
+            gap = np.mean(cols["off"]) - np.mean(cols["main"])
+            verdict = ("so these settings explain part of the gap" if gap > 0.003 else
+                       "so these settings do not explain the gap" if gap > -0.003 else
+                       "so these settings do not help in our runs")
+            L.append(f"* With the official code's settings the mean is {np.mean(cols['off']):.4f}, against "
+                     f"{np.mean(cols['paper']):.4f} in the paper and {np.mean(cols['main']):.4f} for our main run, "
+                     f"{verdict}.")
     missing = [f"{DATASETS[d]} / {n}" for d, r in res.items() for k, n in order if k not in r["runs"]]
     if missing:
         L += ["", f"*Not finished or not run yet:* {', '.join(missing)}."]

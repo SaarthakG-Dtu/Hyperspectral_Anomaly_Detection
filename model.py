@@ -149,15 +149,15 @@ def random_spatial_mask(x, p=0.5, min_size=2, max_size=5):
 class SpatialBranch(nn.Module):
     """Multi-scale spatial feature extraction (parallel 3x3, 5x5) + Mamba over h*w pixel tokens."""
 
-    def __init__(self, dim, d_state):
+    def __init__(self, dim, d_state, conv5=True):
         super().__init__()
         self.conv3 = conv_bn_gelu(dim, dim, 3)
-        self.conv5 = conv_bn_gelu(dim, dim, 5)
+        self.conv5 = conv_bn_gelu(dim, dim, 5) if conv5 else None   # official code: 3x3 only
         self.mamba = MambaLayer(dim, depth=1, d_state=d_state)
 
     def forward(self, f):
         h, w = f.shape[-2:]
-        f = self.conv3(f) + self.conv5(f)
+        f = self.conv3(f) + (self.conv5(f) if self.conv5 is not None else 0)
         return from_tokens(self.mamba(to_tokens(f)), h, w)
 
 
@@ -171,6 +171,8 @@ class SpectralBranch(nn.Module):
         self.spec_conv3 = nn.Conv1d(1, 1, 3, padding=1)
         self.norm7, self.norm3 = nn.LayerNorm(dim), nn.LayerNorm(dim)
         self.starts = list(range(0, dim - group_size + 1, group_stride))
+        if self.starts[-1] + group_size < dim:                  # last group always reaches the end
+            self.starts.append(dim - group_size)
         self.group_size = group_size
         self.mamba = MambaLayer(group_size, depth=1, d_state=d_state)
         self.proj = nn.Sequential(nn.Linear(len(self.starts) * group_size, dim), nn.LayerNorm(dim), nn.GELU())
@@ -209,11 +211,11 @@ class DMS2FHAD(nn.Module):
     """fusion: 'gated' (paper), 'add' (addition fusion), 'spatial' or 'spectral' (single branch).
     The last three are used for the ablation study (paper Table 5)."""
 
-    def __init__(self, in_bands, dim=64, group_size=16, group_stride=8, d_state=16, fusion="gated"):
+    def __init__(self, in_bands, dim=64, group_size=16, group_stride=8, d_state=16, fusion="gated", conv5=True):
         super().__init__()
         self.fusion = fusion
         self.in_head = nn.Sequential(nn.Conv2d(in_bands, dim, 1), nn.BatchNorm2d(dim), nn.GELU())
-        self.spatial = SpatialBranch(dim, d_state)
+        self.spatial = SpatialBranch(dim, d_state, conv5)
         self.spectral = SpectralBranch(dim, group_size, group_stride, d_state)
         self.gate = nn.Sequential(nn.Conv2d(2 * dim, 1, 1), nn.Sigmoid())      # one weight per pixel
         self.proj = nn.Sequential(nn.Conv2d(dim, dim, 1), nn.GELU())
