@@ -271,8 +271,10 @@ def load_results():
         cube, gt = load_hsi(d)
         rx_map = rx_detector(cube)
         r = {"rx": auc_score(rx_map, gt), "rx_tpr1": tpr_at(rx_map, gt), "runs": {}}
-        for f in ["gated", "add", "spatial", "spectral"]:
-            p = RUNS / f"{d}_{f}.npz"
+        # "gated16" = the earlier full-model run (state size 16, AUC every 5 epochs), kept for the ablation,
+        # whose other variants were trained with those settings
+        for f, p in [("gated", RUNS / f"{d}_gated.npz"), ("gated16", RUNS / "extra" / f"{d}_gated_state16.npz")] + \
+                    [(f, RUNS / f"{d}_{f}.npz") for f in ["add", "spatial", "spectral"]]:
             if p.exists():
                 z = np.load(p)
                 r["runs"][f] = {k: z[k] for k in ["best_auc", "final_auc", "best_epoch", "infer_time", "params",
@@ -296,6 +298,7 @@ avg_paper = mean([PAPER_AUC[d]["DMS2F-HAD"] for d in GATED])
 avg_rx = mean([R[d]["rx"] for d in GATED])
 avg_time = mean([float(R[d]["runs"]["gated"]["infer_time"]) for d in GATED])
 params = {d: int(R[d]["runs"]["gated"]["params"]) for d in GATED}
+P_MAIN = f"{max(params.values()) / 1e6:.2f} M" if params else "n/a"     # size of the 189-band model
 
 # ---------------------------------------------------------------- extra test runs (results/runs/extra)
 EXTRA_DS = ["aviris_1", "aviris_2", "San_Diego"]
@@ -306,12 +309,16 @@ def extra(d, tag):
     return float(np.load(p)["best_auc"]) if p.exists() else None
 
 
+# main = current run (state 64, AUC every epoch); s16 = earlier run (state 16, every 5 epochs);
+# e1 = state 16 with AUC every epoch, seeds 0-2; official = all settings of the official code
 X = {d: {"main": float(R[d]["runs"]["gated"]["best_auc"]) if "gated" in R[d]["runs"] else None,
-         "e1": [extra(d, f"every1_s{k}") for k in range(3)], "official": extra(d, "official")} for d in EXTRA_DS}
+         "s16": extra(d, "state16"), "e1": [extra(d, f"every1_s{k}") for k in range(3)],
+         "official": extra(d, "official")} for d in EXTRA_DS}
 seed_spread = [np.ptp(X[d]["e1"]) for d in EXTRA_DS if all(v is not None for v in X[d]["e1"])]
-n_runs = sum(len(R[d]["runs"]) for d in DATASETS)
+n_runs = len(list(RUNS.glob("*.npz"))) + len(list((RUNS / "extra").glob("*.npz")))
 # largest AUC swing between checkpoints after epoch 10 of the main runs (training instability)
-swing = max(float(np.ptp(np.load(RUNS / f"{d}_gated.npz")["auc_hist"][2:, 1])) for d in GATED)
+swing = max(float(np.ptp(h[h[:, 0] > 10, 1])) for h in
+            (np.load(RUNS / f"{d}_gated.npz")["auc_hist"] for d in GATED)) if GATED else 0.0
 
 # ================================================================= 1. title
 s = new_slide(dark=True, notes=(
@@ -329,7 +336,7 @@ text(s, 0.7, 3.95, 7.2, 1.3, [
 ], size=15, color="DCE3EE")
 picture(s, ASSETS / "hsi_cube_dark.png", 8.3, 0.6, 4.5, 4.6)
 box(s, 0.6, 5.45, 12.15, 1.55, fill="1B2B45")
-for i, (v, l) in enumerate([("4", "benchmark scenes"), (str(n_runs), "models trained"), ("0.65 M", "parameters"),
+for i, (v, l) in enumerate([("4", "benchmark scenes"), (str(n_runs), "models trained"), (P_MAIN, "parameters"),
                             (f"{avg_best:.4f}", "our mean AUC"), ("7", "methods compared")]):
     x = 0.85 + i * 2.4
     text(s, x, 5.55, 2.2, 0.7, v, size=30, font=HEAD, bold=True, color=WHITE)
@@ -423,7 +430,7 @@ cd = CategoryChartData()
 Ls = [256, 512, 1024, 2048, 4096]
 cd.categories = [str(L) for L in Ls]
 cd.add_series("Self-attention  ~L²", [L * L / 1e6 for L in Ls])
-cd.add_series("Mamba  ~L·N (N = 16)", [L * 16 / 1e6 for L in Ls])
+cd.add_series("Mamba  ~L·N (state size N = 64)", [L * 64 / 1e6 for L in Ls])
 ch = s.shapes.add_chart(XL_CHART_TYPE.LINE_MARKERS, Inches(6.9), Inches(1.35), Inches(5.9), Inches(5.55), cd).chart
 ch.has_title = True
 ch.chart_title.text_frame.text = "Relative compute vs. sequence length (millions of operations)"
@@ -550,10 +557,10 @@ s = new_slide(notes=(
     "image is trained on its own, without labels, and the ground truth is only used to compute the AUC."))
 title(s, "Implementation and training setup")
 hp = [["Setting", "Value"], ["Patch size / stride", "16 × 16 / 8"], ["Embedding c₁", "64"],
-      ["Band group c₂ / stride k", "16 / 8  (7 groups)"], ["Mamba state size", "16  (official code: 64)"],
+      ["Band group c₂ / stride k", "16 / 8  (7 groups)"], ["Mamba state size", "64 (official code)"],
       ["Optimiser", "Adam, lr 5e-4, weight decay 1e-4"], ["Epochs / batch", "100 / 32"],
       ["Loss", "MSE + 0.1 · L1 (official code)"], ["Masking", "p = 0.5, random 2–5 px rectangle"],
-      ["Model selection", "best AUC, checked every 5 epochs"]]
+      ["Model selection", "best AUC, checked every epoch (code)"], ["Border padding", "zeros (official code)"]]
 table(s, hp, 0.6, 1.4, 5.7, [2.3, 3.0], row_h=0.5, size=13)
 text(s, 6.6, 1.35, 6.2, 0.45, "The method fits in about 440 lines of Python", size=18, font=HEAD, bold=True)
 files = [("model.py", "Implements Mamba and the network."),
@@ -568,10 +575,11 @@ for i, (f, d) in enumerate(files):
     text(s, 9.35, y + 0.07, 3.4, 0.4, d, size=12, color=MUTED)
 box(s, 6.6, 5.0, 6.2, 1.9, fill="FDF1DC")
 text(s, 6.8, 5.08, 5.85, 1.8, [
-    "No mamba_ssm library is needed: the selective scan runs as an exact two-level chunked scan (16 + 16 steps instead "
-    "of 256), so the code runs on Windows, on a CPU or on any GPU.",
-    f"The model has {p_str}.",
-    "Each image is trained on its own without labels; the ground truth is used only to compute the AUC.",
+    [("Rule: ", {"bold": True}), ("we follow the paper where it is explicit and the official code where the paper is "
+                                 "silent.", {})],
+    "The selective scan runs as an exact chunked scan in plain PyTorch, so no mamba_ssm library is needed and the "
+    "code runs on Windows, on a CPU or on any GPU.",
+    f"The model has {p_str}; each image is trained on its own, without labels.",
 ], size=13, space_after=4)
 
 # ================================================================= 9. models compared (paper)
@@ -647,8 +655,8 @@ s = new_slide(notes=(
     "highlights many background structures, while DMS2F-HAD suppresses the background and keeps the planes and rocks."))
 title(s, "Colour anomaly maps")
 picture(s, FIG / "fig3_anomaly_maps_wide.png", 0.6, 1.15, 12.1, 5.7)
-caption(s, "The layout follows Fig. 3 of the paper. The maps are min-max normalised, and each panel shows its AUC in "
-           "the corner.", y=6.9)
+caption(s, "The layout follows Fig. 3 of the paper. Maps are min-max normalised, each panel shows its AUC, and the three "
+           "ablation variants use state size 16.", y=6.9)
 
 # ================================================================= 12. ROC
 s = new_slide(notes=(
@@ -667,36 +675,39 @@ for d in DATASETS:
 table(s, tp, 7.6, 2.9, 4.9, [1.6, 1.4, 1.9], row_h=0.46, size=14, bold_cells=[(i, 2) for i in range(1, len(tp))])
 text(s, 7.6, 2.9 + 0.46 * len(tp) + 0.15, 4.9, 1.7, [
     "Curves close to the top-left corner find most anomalies before raising false alarms.",
-    "On the AVIRIS scenes, DMS2F-HAD finds " + (lambda r: f"{min(r):.0f} to {max(r):.0f} times")(
-        [R[d]["runs"]["gated"]["tpr1"] / R[d]["rx_tpr1"] for d in EXTRA_DS]) + " as many anomaly pixels as RX.",
+    (lambda r: f"On the AVIRIS scenes, DMS2F-HAD finds {min(r):.1f} to {max(r):.0f} times as many anomaly pixels as RX."
+     if r else "The DMS2F-HAD runs are still training.")(
+        [R[d]["runs"]["gated"]["tpr1"] / R[d]["rx_tpr1"] for d in EXTRA_DS if "gated" in R[d]["runs"]]),
     "The legend in each panel gives the AUC.",
 ], size=13, bullets=True, space_after=3)
 
 # ================================================================= 13. ablation
-ab = [("spectral", "Spectral only"), ("spatial", "Spatial only"), ("add", "Addition fusion"), ("gated", "Gated fusion")]
+ab = [("spectral", "Spectral only"), ("spatial", "Spatial only"), ("add", "Addition fusion"), ("gated16", "Gated fusion")]
+pkey = lambda k: "DMS2F-HAD" if k.startswith("gated") else k
 ab_ds = [d for d in DATASETS if all(k in R[d]["runs"] for k, _ in ab)]
 s = new_slide(notes=(
     "This ablation follows the paper's Table 5: each branch on its own, a simple addition of the two, and the full "
-    "gated fusion. Each cell shows our AUC with the paper's value in brackets."))
+    "gated fusion. Each cell shows our AUC with the paper's value in brackets. All four variants were trained with the "
+    "earlier settings, state size 16 and the AUC checked every 5 epochs, so they are comparable with each other."))
 title(s, "Ablation: do we need both branches and the gate?")
 if ab_ds:
     rows = [["Scene"] + [n for _, n in ab]]
     bold = []
     for d in ab_ds:
         a = [float(R[d]["runs"][k]["best_auc"]) for k, _ in ab]
-        pk = [PAPER_AUC[d][k if k != "gated" else "DMS2F-HAD"] for k, _ in ab]
+        pk = [PAPER_AUC[d][pkey(k)] for k, _ in ab]
         rows.append([DATASETS[d]] + [f"{x:.4f}  ({p:.4f})" for x, p in zip(a, pk)])
         bold.append((len(rows) - 1, 1 + int(np.argmax(a))))
     m = [mean([float(R[d]["runs"][k]["best_auc"]) for d in ab_ds]) for k, _ in ab]
-    pm = [mean([PAPER_AUC[d][k if k != "gated" else "DMS2F-HAD"] for d in ab_ds]) for k, _ in ab]
+    pm = [mean([PAPER_AUC[d][pkey(k)] for d in ab_ds]) for k, _ in ab]
     rows.append(["Mean"] + [f"{x:.4f}  ({p:.4f})" for x, p in zip(m, pm)])
     table(s, rows, 0.6, 1.35, 12.15, [1.6, 1.9, 1.9, 1.9, 1.9], row_h=0.55, size=15, highlight_rows=[len(rows) - 1],
           bold_cells=bold)
     y_cap = 1.4 + 0.55 * len(rows)
-    caption(s, "Each cell shows our AUC at the best epoch, with the paper's value in brackets. Bold marks the best of "
-               "our four variants for each scene." + ("" if "Cri" in ab_ds else " The CRI ablation is still training."),
-            y=y_cap)
+    caption(s, "Our AUC at the best epoch, with the paper's value in brackets; bold marks our best variant per scene. All "
+               "four variants use the earlier settings (state size 16, AUC checked every 5 epochs).", y=y_cap)
     mo = dict(zip([k for k, _ in ab], m))
+    mo["gated"] = mo["gated16"]
     trio = [mo["spatial"], mo["add"], mo["gated"]]
     noise = f" (seed-to-seed spread up to {max(seed_spread):.3f})" if len(seed_spread) == len(EXTRA_DS) else ""
     box(s, 0.6, y_cap + 0.45, 12.15, 6.9 - (y_cap + 0.45), fill=PANEL)
@@ -713,59 +724,61 @@ else:
 
 # ================================================================= 14. why results differ
 s = new_slide(notes=(
-    "We follow the paper's text, and the method is the same; our PyTorch Mamba scan gives the same numbers as the CUDA "
-    "kernel. The remaining differences come from three sources: which checkpoint is reported while the AUC swings, "
-    "random seeds, and settings that differ between the paper text and the released code or are not recorded at all. "
-    "I tested each of them with extra runs on the three AVIRIS scenes."))
+    "We follow the paper where it is explicit and the official code where the paper is silent, so our state size, "
+    "checkpoint checks and padding now match the code. The remaining differences are places where the paper's text "
+    "and the code disagree, where we keep the paper. The extra runs show how much each source of difference matters."))
 title(s, "Why our results differ from the paper")
 box(s, 0.6, 1.3, 12.15, 0.68, fill=INK)
-text(s, 0.85, 1.33, 11.7, 0.62, [[("We follow the paper's text. ", {"bold": True, "color": AMBER}),
-     ("The method is the same as in the paper, and our PyTorch Mamba scan matches the CUDA kernel to within 10⁻¹⁵. "
-      "The differences come from settings, randomness and details the paper does not record.", {})]],
+text(s, 0.85, 1.33, 11.7, 0.62, [[("Rule: ", {"bold": True, "color": AMBER}),
+     ("we follow the paper where it is explicit and the official code where the paper is silent. Our PyTorch Mamba "
+      "scan matches the CUDA kernel to within 10⁻¹⁵, so it is not a source of difference.", {})]],
      size=13, color=WHITE, anchor=MSO_ANCHOR.MIDDLE)
-diffs = [["Aspect", "Paper text (our version)", "Official code"],
-         ["Mamba state size", "not stated (we use 16)", "64"],
-         ["Spatial convolutions", "3×3 and 5×5", "3×3 only"],
-         ["Band groups", "16 bands, stride 8", "12 bands, stride 6"],
-         ["Epochs", "100", "150"],
-         ["AUC checked for best epoch", "not stated (we: every 5)", "every epoch"],
-         ["Model state when scoring", "not stated (we: evaluation)", "training mode"]]
-table(s, diffs, 0.6, 2.15, 5.85, [2.0, 2.15, 1.7], row_h=0.38, size=12)
-hdr = ["Scene", "Paper", "Our main\nrun", "Every epoch\n(3 seeds)", "Official\nsettings"]
-rows, have, ranges = [hdr], {"main": [], "e1": [], "off": [], "paper": []}, {}
+diffs = [["Aspect", "Our version", "Official code"],
+         ["Spatial convolutions", "3×3 and 5×5 (paper)", "3×3 only"],
+         ["Band groups", "16 bands, stride 8 (paper)", "12 bands, stride 6"],
+         ["Epochs", "100 (paper)", "150"],
+         ["Mask size", "random per sample (paper)", "fixed 3×3 square"],
+         ["Model mode when scoring", "evaluation", "training (masks on)"],
+         ["State size; AUC checks; padding", "64; every epoch; zeros", "same (code)"]]
+table(s, diffs, 0.6, 2.15, 5.85, [2.15, 2.05, 1.65], row_h=0.38, size=12, highlight_rows=[6])
+hdr = ["Scene", "Paper", "Our run\n(state 64)", "State 16\n(3 seeds)", "Official\nsettings"]
+rows, have, ranges = [hdr], {"main": [], "s16": [], "e1": [], "off": [], "paper": []}, {}
 for d in EXTRA_DS:
     e1 = [v for v in X[d]["e1"] if v is not None]
     off = X[d]["official"]
-    rows.append([DATASETS[d], f"{PAPER_AUC[d]['DMS2F-HAD']:.4f}", f"{X[d]['main']:.4f}",
-                 f"{np.mean(e1):.4f} ± {np.ptp(e1) / 2:.4f}" if len(e1) == 3 else
-                 (f"{np.mean(e1):.4f} ({len(e1)} of 3)" if e1 else "running"),
-                 f"{off:.4f}" if off is not None else "running"])
-    have["paper"].append(PAPER_AUC[d]["DMS2F-HAD"]); have["main"].append(X[d]["main"])
+    rows.append([DATASETS[d], f"{PAPER_AUC[d]['DMS2F-HAD']:.4f}",
+                 f"{X[d]['main']:.4f}" if X[d]["main"] is not None else "running",
+                 f"{np.mean(e1):.4f} ± {np.ptp(e1) / 2:.4f}" if len(e1) == 3 else "–",
+                 f"{off:.4f}" if off is not None else "–"])
+    have["paper"].append(PAPER_AUC[d]["DMS2F-HAD"])
+    for k, v in [("main", X[d]["main"]), ("s16", X[d]["s16"]), ("off", off)]:
+        if v is not None:
+            have[k].append(v)
     if len(e1) == 3:
         have["e1"].append(np.mean(e1))
-    if off is not None:
-        have["off"].append(off)
-    ours_all = [X[d]["main"]] + e1 + ([off] if off is not None else [])
+    ours_all = [v for v in [X[d]["main"], X[d]["s16"], off] + e1 if v is not None]
     ranges[d] = (min(ours_all), max(ours_all))
 full = lambda k: len(have[k]) == len(EXTRA_DS)
-rows.append(["Mean", f"{np.mean(have['paper']):.4f}", f"{np.mean(have['main']):.4f}",
+rows.append(["Mean", f"{np.mean(have['paper']):.4f}", f"{np.mean(have['main']):.4f}" if full("main") else "–",
              f"{np.mean(have['e1']):.4f}" if full("e1") else "–", f"{np.mean(have['off']):.4f}" if full("off") else "–"])
-table(s, rows, 6.65, 2.15, 6.1, [1.3, 0.95, 1.05, 1.7, 1.1], row_h=0.46, size=13, highlight_rows=[len(rows) - 1])
-caption(s, "Best-epoch AUC on the AVIRIS scenes; '±' is half the range over seeds 0, 1 and 2.", y=4.55, x=6.65,
-        w=6.1)
-r1 = (f"Checkpoint choice: the AUC swings by up to {swing:.2f} between checkpoints, and the paper reports the best one, "
-      "so how often it is checked matters")
-r1 += (f"; checking every epoch moves our mean from {np.mean(have['main']):.4f} to {np.mean(have['e1']):.4f}."
-       if full("e1") else ".")
-reasons = [r1]
+table(s, rows, 6.65, 2.15, 6.1, [1.3, 0.95, 1.15, 1.6, 1.1], row_h=0.46, size=13, highlight_rows=[len(rows) - 1])
+caption(s, "Best-epoch AUC on the AVIRIS scenes. 'State 16' checks the AUC every epoch; '±' is half the range over "
+           "seeds 0, 1 and 2.", y=4.55, x=6.65, w=6.1)
+reasons = [f"Checkpoint choice: the AUC swings by up to {swing:.2f} between checkpoints, and the paper reports the best "
+           "one, so how often it is checked matters"
+           + (f"; checking every epoch instead of every five raised our earlier mean from {np.mean(have['s16']):.4f} "
+              f"to {np.mean(have['e1']):.4f}." if full("s16") and full("e1") else ".")]
 if full("e1"):
     reasons.append(f"Randomness: with three seeds, the best AUC of one scene varies by up to {max(seed_spread):.3f}.")
-if full("off"):
-    gap = np.mean(have["off"]) - np.mean(have["main"])
-    verdict = ("which explains part of the gap." if gap > 0.003 else "which does not explain the gap." if gap > -0.003
-               else "which does not help in our runs.")
-    reasons.append(f"Settings: the official code's settings give a mean of {np.mean(have['off']):.4f} against "
-                   f"{np.mean(have['paper']):.4f} in the paper, {verdict}")
+if full("main") and full("e1") and full("off"):
+    reasons.append(f"Settings: state size 64 gives a mean of {np.mean(have['main']):.4f}, state 16 gives "
+                   f"{np.mean(have['e1']):.4f} and the full official settings {np.mean(have['off']):.4f}, against "
+                   f"{np.mean(have['paper']):.4f} in the paper; these differences are within the seed variation."
+                   if max(np.mean(have['main']), np.mean(have['e1']), np.mean(have['off']))
+                   - min(np.mean(have['main']), np.mean(have['e1']), np.mean(have['off'])) <= max(seed_spread) else
+                   f"Settings: state size 64 gives a mean of {np.mean(have['main']):.4f}, state 16 gives "
+                   f"{np.mean(have['e1']):.4f} and the full official settings {np.mean(have['off']):.4f}, against "
+                   f"{np.mean(have['paper']):.4f} in the paper.")
 missed = [d for d in EXTRA_DS if ranges[d][1] < PAPER_AUC[d]["DMS2F-HAD"] - 0.005]
 r4 = ("Not recorded: the released code cannot run as published (two files are missing and its Mamba library is "
       "Linux-only), and the settings and seed behind each paper number are not documented.")
@@ -783,7 +796,7 @@ title(s, "Takeaways", dark=True)
 cols = [("What the method does", [
             "It learns the background of one image without labels, as a patch autoencoder.",
             "It models space and spectrum in two Mamba branches and mixes them per pixel with a gate.",
-            "It stays small (≈ 0.65 M parameters) and fast thanks to linear-time Mamba."]),
+            f"It stays small (≈ {P_MAIN} parameters in our version) and fast thanks to linear-time Mamba."]),
         ("What we reproduced", [
             f"Our mean AUC is {avg_best:.4f}, against {avg_paper:.4f} in the paper on the same {len(GATED)} scenes.",
             "Our RX baseline matches the paper exactly.",
@@ -807,9 +820,12 @@ for i, (h, pts) in enumerate(cols):
     text(s, x + 0.15, 2.25, 2.65, 3.25, pts, size=14, color="DCE3EE", bullets=True, space_after=6)
 box(s, 0.6, 5.75, 12.15, 1.15, fill=AMBER)
 text(s, 0.85, 5.8, 11.7, 1.05, [[("Bottom line: ", {"bold": True}),
-     (f"A dual-branch Mamba autoencoder with 0.65 M parameters gets close to the paper's accuracy (mean AUC "
-      f"{avg_best:.4f} against {avg_paper:.4f}) on the released scenes. The open problem is how to choose the "
-      "checkpoint without labels.", {})]], size=16, color=INK, anchor=MSO_ANCHOR.MIDDLE)
+     (f"A dual-branch Mamba autoencoder with {P_MAIN} parameters "
+      + ("matches" if avg_best >= avg_paper else "gets close to")
+      + f" the paper's accuracy on the released scenes (mean AUC {avg_best:.4f} against {avg_paper:.4f})"
+      + (f", although {' and '.join(DATASETS[d] for d in missed)} stays below it" if missed else "")
+      + ". The open problem is how to choose the checkpoint without labels.", {})]],
+     size=16, color=INK, anchor=MSO_ANCHOR.MIDDLE)
 
 prs.save(OUT)
 print("saved", OUT, "with", len(prs.slides), "slides")

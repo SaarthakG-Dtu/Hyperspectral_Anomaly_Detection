@@ -52,7 +52,7 @@ def extract_patches(cube, size=16, stride=8):
     """(H, W, C) numpy -> overlapping patches (N, C, size, size) tensor (paper Sec. 3.1.1)."""
     x = torch.from_numpy(cube).permute(2, 0, 1)[None]              # (1, C, H, W)
     H, W = cube.shape[:2]
-    x = F.pad(x, (0, _pad_amount(W, size, stride), 0, _pad_amount(H, size, stride)), mode="reflect")
+    x = F.pad(x, (0, _pad_amount(W, size, stride), 0, _pad_amount(H, size, stride)))   # zeros, as in the official code
     cols = F.unfold(x, size, stride=stride)                         # (1, C*size*size, N)
     return cols[0].T.reshape(-1, cube.shape[2], size, size).contiguous()
 

@@ -52,6 +52,9 @@ def load_results():
                 run = dict(np.load(p))
                 r["runs"][f] = run
                 r["maps"][m] = run["best_map"]
+        p16 = RUNS / "extra" / f"{d}_gated_state16.npz"    # earlier full-model run, used in the ablation
+        if p16.exists():
+            r["runs"]["gated16"] = dict(np.load(p16))
         res[d] = r
     return res
 
@@ -129,7 +132,8 @@ def fig3_anomaly_maps(res, wide=False):
     cb.ax.tick_params(labelsize=7)
     fig.text(0.34, 0.947, "Anomaly absent", ha="right", va="center", fontsize=8)
     fig.text(0.66, 0.947, "Anomaly present", ha="left", va="center", fontsize=8)
-    fig.text(0.5, -0.01, "Numbers in the corner = AUC.  Maps min-max normalised to [0, 1].",
+    fig.text(0.5, -0.01, "Numbers in the corner = AUC.  Maps min-max normalised to [0, 1].  The spectral-only, "
+             "spatial-only and addition variants use Mamba state size 16.",
              ha="center", fontsize=7, color=MUTED)
     save(fig, "fig3_anomaly_maps.png")
 
@@ -249,7 +253,7 @@ def tables(res):
     (ROOT / "results" / "auc_table.csv").write_text("\n".join(csv) + "\n")
 
     # ---- Table 5 style: ablation
-    order = [("spectral", "Spectral only"), ("spatial", "Spatial only"), ("add", "Addition fusion"), ("gated", "Gated fusion")]
+    order = [("spectral", "Spectral only"), ("spatial", "Spatial only"), ("add", "Addition fusion"), ("gated16", "Gated fusion")]
     have = [(k, n) for k, n in order if any(k in r["runs"] for r in res.values())]
     res = {d: r for d, r in res.items() if all(k in r["runs"] for k, _ in have)}   # datasets with every variant
     if len(have) < 2 or not res:
@@ -257,16 +261,17 @@ def tables(res):
     rows, best_cells, means = [], [], {k: [] for k, _ in have}
     for i, (d, r) in enumerate(res.items()):
         aucs = [float(r["runs"][k]["best_auc"]) for k, _ in have]
-        paper = [PAPER_AUC[d][k if k != "gated" else "DMS2F-HAD"] for k, _ in have]
+        paper = [PAPER_AUC[d]["DMS2F-HAD" if k.startswith("gated") else k] for k, _ in have]
         for (k, _), a in zip(have, aucs):
             means[k].append(a)
         rows.append([DATASETS[d]] + [f"{a:.4f}  ({p:.4f})" for a, p in zip(aucs, paper)])
         best_cells.append((i, 1 + int(np.argmax(aucs))))
-    pm = [np.mean([PAPER_AUC[d][k if k != "gated" else "DMS2F-HAD"] for d in res]) for k, _ in have]
+    pm = [np.mean([PAPER_AUC[d]["DMS2F-HAD" if k.startswith("gated") else k] for d in res]) for k, _ in have]
     rows.append(["Average"] + [f"{np.mean(means[k]):.4f}  ({p:.4f})" for (k, _), p in zip(have, pm)])
     draw_table(rows, ["Dataset"] + [n for _, n in have], "table5_ablation.png",
                "Ablation: branches and fusion  —  ours (paper)", col_w=[1.2] + [1.7] * len(have),
-               note="Each cell: our AUC (paper's reported AUC in brackets). Green = best of our variants per dataset.",
+               note="Each cell: our AUC (paper's in brackets). Green = our best variant. All variants: state size 16, "
+                    "AUC checked every 5 epochs.",
                bold_best=best_cells)
 
 
@@ -420,74 +425,82 @@ def update_readme(res):
     if best:
         L.append(f"| **Average ({len(best)} scenes)** | {np.mean(rx):.4f} | **{np.mean(best):.4f}** | {np.mean(final):.4f} "
                  f"| {np.mean(paper):.4f} | |")
-    order = [("spectral", "Spectral only"), ("spatial", "Spatial only"), ("add", "Addition fusion"), ("gated", "Gated fusion (full)")]
+    order = [("spectral", "Spectral only"), ("spatial", "Spatial only"), ("add", "Addition fusion"),
+             ("gated16", "Gated fusion (full)")]
+    pk = lambda k: "DMS2F-HAD" if k.startswith("gated") else k
     rows = [d for d, r in res.items() if all(k in r["runs"] for k, _ in order)]
     if rows:
-        L += ["", "**Ablation** (paper Table 5) — our AUC at the best epoch, paper value in brackets:", "",
+        L += ["", "**Ablation** (paper Table 5): our AUC at the best epoch, the paper's value in brackets. All four "
+                  "variants use the earlier settings (Mamba state size 16, AUC checked every 5 epochs), so they are "
+                  "comparable with each other.", "",
               "| Scene | " + " | ".join(n for _, n in order) + " |", "|---|" + "---|" * len(order)]
         for d in rows:
             a = [float(res[d]["runs"][k]["best_auc"]) for k, _ in order]
-            cells = [(f"**{x:.4f}**" if x == max(a) else f"{x:.4f}") +
-                     f" ({PAPER_AUC[d][k if k != 'gated' else 'DMS2F-HAD']:.4f})" for x, (k, _) in zip(a, order)]
+            cells = [(f"**{x:.4f}**" if x == max(a) else f"{x:.4f}") + f" ({PAPER_AUC[d][pk(k)]:.4f})"
+                     for x, (k, _) in zip(a, order)]
             L.append(f"| {DATASETS[d]} | " + " | ".join(cells) + " |")
         means = [np.mean([float(res[d]["runs"][k]["best_auc"]) for d in rows]) for k, _ in order]
-        pmeans = [np.mean([PAPER_AUC[d][k if k != "gated" else "DMS2F-HAD"] for d in rows]) for k, _ in order]
+        pmeans = [np.mean([PAPER_AUC[d][pk(k)] for d in rows]) for k, _ in order]
         L.append("| **Average** | " + " | ".join((f"**{x:.4f}**" if x == max(means) else f"{x:.4f}") + f" ({p:.4f})"
                                               for x, p in zip(means, pmeans)) + " |")
         spread = max(means[1:]) - min(means[1:])
         L += ["", f"Reading: the spectral branch alone is clearly the weakest variant, as in the paper. Spatial-only, "
-                  f"addition and gated fusion are within {spread:.3f} AUC of each other on average, so with one seed per "
-                  f"run we could not confirm the paper's gain from the gate on these scenes."]
+                  f"addition and gated fusion are within {spread:.3f} AUC of each other on average, so we could not "
+                  f"confirm the paper's gain from the gate on these scenes."]
+
     # ---- test runs that explain the gap to the paper (results/runs/extra)
     def extra_auc(d, tag):
         p = RUNS / "extra" / f"{d}_gated_{tag}.npz"
         return float(np.load(p)["best_auc"]) if p.exists() else None
     eds = ["aviris_1", "aviris_2", "San_Diego"]
     if (RUNS / "extra").exists():
-        L += ["", "**Why our numbers differ from the paper.** Best-epoch AUC of extra test runs on the three AVIRIS "
-                  "scenes: the main run, the same settings with the AUC checked every epoch for seeds 0, 1 and 2, and "
-                  "the official code's settings (`--official`).", "",
-              "| Scene | Paper | Our main run | AUC checked every epoch, seeds 0 / 1 / 2 | Official settings |",
-              "|---|---|---|---|---|"]
-        cols = {"paper": [], "main": [], "e1": [], "off": []}
-        spreads = []
+        L += ["", "**Why our numbers differ from the paper.** Best-epoch AUC on the three AVIRIS scenes for our run "
+                  "(state size 64, AUC checked every epoch), the earlier runs with state size 16 (AUC checked every 5 "
+                  "epochs, and every epoch with seeds 0, 1 and 2), and all of the official code's settings "
+                  "(`--official`).", "",
+              "| Scene | Paper | Our run (state 64) | State 16, every 5 epochs | State 16, every epoch, seeds 0 / 1 / 2 "
+              "| Official settings |", "|---|---|---|---|---|---|"]
+        cols = {"paper": [], "main": [], "s16": [], "e1": [], "off": []}
+        spreads, n = [], len(eds)
+        fmt = lambda v: f"{v:.4f}" if v is not None else "running"
         for d in eds:
+            g = res[d]["runs"].get("gated")
+            main = float(g["best_auc"]) if g is not None else None
+            s16, off = extra_auc(d, "state16"), extra_auc(d, "official")
             e1 = [extra_auc(d, f"every1_s{k}") for k in range(3)]
-            off = extra_auc(d, "official")
-            main = float(res[d]["runs"]["gated"]["best_auc"])
-            e1s = " / ".join(f"{v:.4f}" if v is not None else "running" for v in e1)
-            offs = f"{off:.4f}" if off is not None else "running"
-            L.append(f"| {DATASETS[d]} | {PAPER_AUC[d]['DMS2F-HAD']:.4f} | {main:.4f} | {e1s} | {offs} |")
-            cols["paper"].append(PAPER_AUC[d]["DMS2F-HAD"]); cols["main"].append(main)
+            L.append(f"| {DATASETS[d]} | {PAPER_AUC[d]['DMS2F-HAD']:.4f} | {fmt(main)} | {fmt(s16)} | "
+                     + " / ".join(fmt(v) for v in e1) + f" | {fmt(off)} |")
+            cols["paper"].append(PAPER_AUC[d]["DMS2F-HAD"])
+            for k, v in [("main", main), ("s16", s16), ("off", off)]:
+                if v is not None:
+                    cols[k].append(v)
             if all(v is not None for v in e1):
                 cols["e1"].append(np.mean(e1)); spreads.append(max(e1) - min(e1))
-            if off is not None:
-                cols["off"].append(off)
-        n = len(eds)
-        L.append(f"| **Mean** | {np.mean(cols['paper']):.4f} | {np.mean(cols['main']):.4f} | "
-                 + (f"{np.mean(cols['e1']):.4f} (mean of seeds)" if len(cols["e1"]) == n else "–")
-                 + (f" | {np.mean(cols['off']):.4f} |" if len(cols["off"]) == n else " | – |"))
-        L.append("")
+        mfmt = lambda k: f"{np.mean(cols[k]):.4f}" if len(cols[k]) == n else "–"
+        L += [f"| **Mean** | {mfmt('paper')} | {mfmt('main')} | {mfmt('s16')} | {mfmt('e1')} (mean of seeds) "
+              f"| {mfmt('off')} |", ""]
         if len(cols["e1"]) == n:
-            L += [f"* Across three seeds, the best AUC of one scene varies by up to {max(spreads):.3f}, so "
-                      f"differences of this size between single runs are run-to-run noise.",
-                  f"* Checking the AUC every epoch instead of every five epochs changes the mean of seed 0 from "
-                  f"{np.mean(cols['main']):.4f} to {np.mean([extra_auc(d, 'every1_s0') for d in eds]):.4f}."]
-        if len(cols["off"]) == n:
-            gap = np.mean(cols["off"]) - np.mean(cols["main"])
-            verdict = ("so these settings explain part of the gap" if gap > 0.003 else
-                       "so these settings do not explain the gap" if gap > -0.003 else
-                       "so these settings do not help in our runs")
-            L.append(f"* With the official code's settings the mean is {np.mean(cols['off']):.4f}, against "
-                     f"{np.mean(cols['paper']):.4f} in the paper and {np.mean(cols['main']):.4f} for our main run, "
-                     f"{verdict}.")
-        L.append("* The released code cannot run as published (it imports two files that are not in the repository, "
-                 "and its Mamba library is Linux-only), and the settings and seed behind each number in the paper are "
-                 "not documented.")
+            L.append(f"* **Randomness:** across three seeds, the best AUC of one scene varies by up to "
+                     f"{max(spreads):.3f}, so differences of this size between single runs are run-to-run noise.")
+        if len(cols["s16"]) == n and len(cols["e1"]) == n:
+            L.append(f"* **Checkpoint choice:** the AUC swings strongly between epochs and the paper reports the best "
+                     f"one, so checking every epoch instead of every five raised our earlier mean from "
+                     f"{np.mean(cols['s16']):.4f} to {np.mean(cols['e1']):.4f}.")
+        if all(len(cols[k]) == n for k in ("main", "e1", "off")):
+            vals = [np.mean(cols[k]) for k in ("main", "e1", "off")]
+            L.append(f"* **Settings:** state size 64 gives a mean of {vals[0]:.4f}, state size 16 gives {vals[1]:.4f} "
+                     f"and the full official settings give {vals[2]:.4f}, against {np.mean(cols['paper']):.4f} in the "
+                     "paper" + ("; these differences are within the seed variation."
+                                if spreads and max(vals) - min(vals) <= max(spreads) else "."))
+        L.append("* **Not recorded:** the released code cannot run as published (it imports two files that are not in "
+                 "the repository, and its Mamba library is Linux-only), and the settings and seed behind each number "
+                 "in the paper are not documented.")
         for d in eds:
-            ours = [float(res[d]["runs"]["gated"]["best_auc"])] + [v for v in
-                    [extra_auc(d, f"every1_s{k}") for k in range(3)] + [extra_auc(d, "official")] if v is not None]
-            if max(ours) < PAPER_AUC[d]["DMS2F-HAD"] - 0.005:
+            g = res[d]["runs"].get("gated")
+            ours = [v for v in [float(g["best_auc"]) if g is not None else None, extra_auc(d, "state16"),
+                                extra_auc(d, "official")] + [extra_auc(d, f"every1_s{k}") for k in range(3)]
+                    if v is not None]
+            if ours and max(ours) < PAPER_AUC[d]["DMS2F-HAD"] - 0.005:
                 L.append(f"* **{DATASETS[d]} is not reproduced:** all {len(ours)} of our runs give "
                          f"{min(ours):.4f}–{max(ours):.4f}, against {PAPER_AUC[d]['DMS2F-HAD']:.4f} in the paper. The "
                          f"other scenes match or exceed the paper.")

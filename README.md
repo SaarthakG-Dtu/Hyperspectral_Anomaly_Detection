@@ -93,21 +93,22 @@ Texas Coast, Bay Champagne) are not in the official release, so they are not use
 
 ## 4. Results
 
-Training follows the paper (Sec. 4.3): Adam, lr 5e-4, weight decay 1e-4, 100 epochs, batch 32, 16×16 patches,
-stride 8, c1 = 64, c2 = 16, k = 8; loss = MSE + 0.1·L1 (from the official code). One model is trained per image,
-without labels; the ground truth is used only for evaluation. Model size: **0.647 M parameters** for 189 bands
-(paper: 0.64 M).
+Training follows the paper where it is explicit (Sec. 4.3: Adam, lr 5e-4, weight decay 1e-4, 100 epochs, 16×16
+patches, stride 8, c1 = 64, c2 = 16, k = 8) and the official code where the paper is silent (loss = MSE + 0.1·L1,
+batch 32, Mamba state size 64, AUC checked every epoch, zero padding at the image border). One model is trained per
+image, without labels; the ground truth is used only for evaluation. Model size: **0.744 M parameters** for 189
+bands (paper: 0.64 M; see section 7 for why).
 
 <!-- RESULTS START -->
 | Scene | RX (ours / paper) | DMS2F-HAD ours, best epoch | DMS2F-HAD ours, epoch 100 | DMS2F-HAD paper | Inference (s) |
 |---|---|---|---|---|---|
-| CRI | 0.9990 / 0.9989 | **0.9999** (epoch 50) | 0.9987 | 0.9999 | 2.054 |
-| AVIRIS-1 | 0.8866 / 0.8866 | **0.9871** (epoch 35) | 0.9597 | 0.9891 | 0.140 |
-| AVIRIS-2 | 0.9181 / 0.9181 | **0.9639** (epoch 60) | 0.9250 | 0.9851 | 0.309 |
-| San Diego | 0.9403 / 0.9403 | **0.9876** (epoch 25) | 0.9707 | 0.9722 | 0.182 |
-| **Average (4 scenes)** | 0.9360 | **0.9846** | 0.9635 | 0.9866 | |
+| CRI | 0.9990 / 0.9989 | **1.0000** (epoch 79) | 1.0000 | 0.9999 | 4.124 |
+| AVIRIS-1 | 0.8866 / 0.8866 | **0.9906** (epoch 25) | 0.9557 | 0.9891 | 0.288 |
+| AVIRIS-2 | 0.9181 / 0.9181 | **0.9748** (epoch 49) | 0.8065 | 0.9851 | 0.441 |
+| San Diego | 0.9403 / 0.9403 | **0.9889** (epoch 24) | 0.9387 | 0.9722 | 0.283 |
+| **Average (4 scenes)** | 0.9360 | **0.9886** | 0.9252 | 0.9866 | |
 
-**Ablation** (paper Table 5) — our AUC at the best epoch, paper value in brackets:
+**Ablation** (paper Table 5): our AUC at the best epoch, the paper's value in brackets. All four variants use the earlier settings (Mamba state size 16, AUC checked every 5 epochs), so they are comparable with each other.
 
 | Scene | Spectral only | Spatial only | Addition fusion | Gated fusion (full) |
 |---|---|---|---|---|
@@ -117,27 +118,27 @@ without labels; the ground truth is used only for evaluation. Model size: **0.64
 | San Diego | 0.9225 (0.9158) | 0.9875 (0.9674) | **0.9882** (0.9532) | 0.9876 (0.9722) |
 | **Average** | 0.9430 (0.9428) | 0.9842 (0.9784) | **0.9860** (0.9810) | 0.9846 (0.9866) |
 
-Reading: the spectral branch alone is clearly the weakest variant, as in the paper. Spatial-only, addition and gated fusion are within 0.002 AUC of each other on average, so with one seed per run we could not confirm the paper's gain from the gate on these scenes.
+Reading: the spectral branch alone is clearly the weakest variant, as in the paper. Spatial-only, addition and gated fusion are within 0.002 AUC of each other on average, so we could not confirm the paper's gain from the gate on these scenes.
 
-**Why our numbers differ from the paper.** Best-epoch AUC of extra test runs on the three AVIRIS scenes: the main run, the same settings with the AUC checked every epoch for seeds 0, 1 and 2, and the official code's settings (`--official`).
+**Why our numbers differ from the paper.** Best-epoch AUC on the three AVIRIS scenes for our run (state size 64, AUC checked every epoch), the earlier runs with state size 16 (AUC checked every 5 epochs, and every epoch with seeds 0, 1 and 2), and all of the official code's settings (`--official`).
 
-| Scene | Paper | Our main run | AUC checked every epoch, seeds 0 / 1 / 2 | Official settings |
-|---|---|---|---|---|
-| AVIRIS-1 | 0.9891 | 0.9871 | 0.9905 / 0.9881 / 0.9920 | 0.9894 |
-| AVIRIS-2 | 0.9851 | 0.9639 | 0.9700 / 0.9726 / 0.9632 | 0.9715 |
-| San Diego | 0.9722 | 0.9876 | 0.9892 / 0.9894 / 0.9889 | 0.9895 |
-| **Mean** | 0.9821 | 0.9795 | 0.9826 (mean of seeds) | 0.9835 |
+| Scene | Paper | Our run (state 64) | State 16, every 5 epochs | State 16, every epoch, seeds 0 / 1 / 2 | Official settings |
+|---|---|---|---|---|---|
+| AVIRIS-1 | 0.9891 | 0.9906 | 0.9871 | 0.9905 / 0.9881 / 0.9920 | 0.9894 |
+| AVIRIS-2 | 0.9851 | 0.9748 | 0.9639 | 0.9700 / 0.9726 / 0.9632 | 0.9715 |
+| San Diego | 0.9722 | 0.9889 | 0.9876 | 0.9892 / 0.9894 / 0.9889 | 0.9895 |
+| **Mean** | 0.9821 | 0.9848 | 0.9795 | 0.9826 (mean of seeds) | 0.9835 |
 
-* Across three seeds, the best AUC of one scene varies by up to 0.009, so differences of this size between single runs are run-to-run noise.
-* Checking the AUC every epoch instead of every five epochs changes the mean of seed 0 from 0.9795 to 0.9832.
-* With the official code's settings the mean is 0.9835, against 0.9821 in the paper and 0.9795 for our main run, so these settings explain part of the gap.
-* The released code cannot run as published (it imports two files that are not in the repository, and its Mamba library is Linux-only), and the settings and seed behind each number in the paper are not documented.
-* **AVIRIS-2 is not reproduced:** all 5 of our runs give 0.9632–0.9726, against 0.9851 in the paper. The other scenes match or exceed the paper.
+* **Randomness:** across three seeds, the best AUC of one scene varies by up to 0.009, so differences of this size between single runs are run-to-run noise.
+* **Checkpoint choice:** the AUC swings strongly between epochs and the paper reports the best one, so checking every epoch instead of every five raised our earlier mean from 0.9795 to 0.9826.
+* **Settings:** state size 64 gives a mean of 0.9848, state size 16 gives 0.9826 and the full official settings give 0.9835, against 0.9821 in the paper; these differences are within the seed variation.
+* **Not recorded:** the released code cannot run as published (it imports two files that are not in the repository, and its Mamba library is Linux-only), and the settings and seed behind each number in the paper are not documented.
+* **AVIRIS-2 is not reproduced:** all 6 of our runs give 0.9632–0.9748, against 0.9851 in the paper. The other scenes match or exceed the paper.
 <!-- RESULTS END -->
 
 **About "best epoch" vs. "epoch 100".** The paper reports "the model with the best validation performance", and
 the official code keeps the checkpoint with the highest AUC against the ground truth. We do the same (AUC checked
-every 5 epochs) in the *best epoch* column. Because that uses labels to choose the checkpoint, we also report the
+every epoch, as in the code) in the *best epoch* column. Because that uses labels to choose the checkpoint, we also report the
 model after all 100 epochs. The AUC fluctuates during training even while the loss keeps falling: once the
 background is learned, the decoder starts to reconstruct the anomalies too. See the training curves below.
 
@@ -212,35 +213,42 @@ python presentation/make_ppt.py                      # rebuild the slide deck
 ```
 
 `--dataset` is one of `Cri`, `aviris_1`, `aviris_2`, `San_Diego`, `all`. A GPU is recommended; CPU works but is slow.
+Other options: `--official` (all settings of the official code), `--d_state`, `--eval_every`, `--seed` and `--tag`
+(tagged runs are saved to `results/runs/extra/`). The ablation runs and the `state16` runs in `results/runs/extra/`
+were made with the earlier defaults (state size 16, AUC every 5 epochs, mirror padding at the border); commit
+`935f08f` reproduces them exactly.
 
 ## 7. Differences from the paper and the official code
 
-**We follow the paper's text.** The architecture, the loss, the data, the normalisation and the anomaly score are
-the same as in the paper, and where the paper text and the official code differ, we followed the paper text. The
-official code could not serve as a direct reference: as released it imports two files that are not in the repository
+**Rule: we follow the paper where it is explicit, and the official code where the paper is silent.** The
+architecture, the loss, the data, the normalisation and the anomaly score are the same as in the paper. The official
+code could not be run directly: as released it imports two files that are not in the repository
 (`src/project_paths.py` and `src/auc_tracker_abalation.py`), and its Mamba library (`mamba_ssm`) ships compiled CUDA
 kernels for Linux only. Replacing that kernel does not change the results: our plain-PyTorch scan matches the
-step-by-step recurrence to within 10⁻¹⁵. The remaining differences are listed below; their effect on the results is
-measured in the results section under "Why our numbers differ from the paper".
+step-by-step recurrence to within 10⁻¹⁵.
 
-| | Official code | This implementation |
-|---|---|---|
-| Mamba | `mamba_ssm` CUDA kernels (Linux only) | plain PyTorch; exact two-level chunked selective scan (16 + 16 steps instead of 256) |
-| Mamba state size | 64 | 16 |
-| Spatial multi-scale conv | 3×3 only (5×5 commented out) | 3×3 and 5×5 in parallel, as in the paper text |
-| Band groups | 12 bands, stride 6 | c2 = 16, k = 8, as in the paper text (Sec. 4.3) |
-| Epochs and checkpoint checks | 150 epochs, AUC checked every epoch | 100 epochs (paper text), AUC checked every 5 epochs |
-| Masking | per batch, fixed 3×3 square | per sample, random 2–5 px rectangle |
-| Evaluation | model left in training mode | `model.eval()` (no masking or dropout at test time) |
+| | Paper text | Official code | This implementation |
+|---|---|---|---|
+| Mamba kernel | – | `mamba_ssm` CUDA kernels (Linux only) | plain PyTorch, exact two-level chunked selective scan |
+| Mamba state size | not stated | 64 | 64 (code) |
+| AUC checks for the best epoch | "best validation performance" | every epoch | every epoch (code) |
+| Padding at the image border | not stated | zeros | zeros (code) |
+| Spatial multi-scale conv | 3×3 and 5×5 | 3×3 only (5×5 commented out) | 3×3 and 5×5 (paper) |
+| Band groups | c2 = 16, k = 8 | 12 bands, stride 6 | 16 bands, stride 8 (paper) |
+| Epochs | 100 | 150 | 100 (paper) |
+| Masking | random size and position per sample | per batch, fixed 3×3 square | per sample, random 2–5 px rectangle (paper) |
+| Model mode when scoring | not stated | training mode (random masks stay on) | evaluation mode |
+
+The one exception to the rule is the last row: scoring in training mode leaves the random masking switched on, so
+the same model gives a different anomaly map each time. We treat that as a bug and score in evaluation mode.
 
 **Parameter count.** Rebuilding the official model's layer shapes gives exactly **0.640 M** used parameters with
-Mamba state size 64, which is the number in the paper. Our model has 0.647 M parameters with state size 16; the
-similar total is a coincidence, because our 5×5 convolution and band groups add parameters that the smaller state
-removes.
+Mamba state size 64, which is the number in the paper. Our model has 0.744 M parameters with the same state size,
+because the paper text's 5×5 convolution and 16-band groups add parameters that the released code does not have.
 
-`python train.py --dataset aviris_2 --official` trains with the official code's settings (state size 64, 3×3 conv
-only, 12-band groups, 150 epochs, AUC checked every epoch), so the two versions can be compared directly. The test
-runs that do this are summarised in the results section under "Why our numbers differ from the paper".
+`python train.py --dataset aviris_2 --official` trains with all of the official code's settings (state size 64, 3×3
+conv only, 12-band groups, 150 epochs, AUC checked every epoch), so the two versions can be compared directly. The
+test runs are summarised in the results section under "Why our numbers differ from the paper".
 
 ## 8. Limitations
 

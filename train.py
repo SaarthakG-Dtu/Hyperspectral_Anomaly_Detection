@@ -5,8 +5,9 @@ Train DMS2F-HAD on one hyperspectral image (unsupervised) and detect anomalies.
     python train.py --dataset aviris_1 --fusion spatial  # ablation variants: spatial | spectral | add
     python train.py --dataset all --fusion all          # everything (sequential)
 
-Training follows Sec. 4.3 of the paper: Adam, lr 5e-4, weight decay 1e-4, 100 epochs,
-16x16 patches, stride 8, c1 = 64, c2 = 16, k = 8.  Loss = MSE + 0.1 * L1 (official code).
+Rule: follow the paper where it is explicit, and the official code where the paper is silent.
+Paper (Sec. 4.3): Adam, lr 5e-4, weight decay 1e-4, 100 epochs, 16x16 patches, stride 8, c1 = 64, c2 = 16, k = 8.
+Official code: loss = MSE + 0.1 * L1, batch 32, Mamba state size 64, AUC checked every epoch, zero padding.
 Anomaly score = L2 norm of the reconstruction residual of every pixel (Eq. 2).
 Results go to results/runs/<dataset>_<fusion>.npz
 """
@@ -38,8 +39,8 @@ def detect(model, patches, H, W, cube_t, batch=64):
 OFFICIAL = dict(d_state=64, conv5=False, group_size=12, group_stride=6, epochs=150, eval_every=1)
 
 
-def train(dataset, fusion="gated", epochs=100, batch=32, lr=5e-4, wd=1e-4, eval_every=5, seed=0,
-          d_state=16, conv5=True, group_size=16, group_stride=8, tag=None):
+def train(dataset, fusion="gated", epochs=100, batch=32, lr=5e-4, wd=1e-4, eval_every=1, seed=0,
+          d_state=64, conv5=True, group_size=16, group_stride=8, tag=None):
     random.seed(seed); np.random.seed(seed); torch.manual_seed(seed)
     dev = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -106,7 +107,8 @@ if __name__ == "__main__":
     p.add_argument("--epochs", type=int, default=100)
     p.add_argument("--batch", type=int, default=32)
     p.add_argument("--seed", type=int, default=0)
-    p.add_argument("--eval_every", type=int, default=5, help="evaluate AUC every N epochs")
+    p.add_argument("--eval_every", type=int, default=1, help="evaluate AUC every N epochs (official code: 1)")
+    p.add_argument("--d_state", type=int, default=64, help="Mamba state size (official code: 64)")
     p.add_argument("--official", action="store_true",
                    help="use the official code's settings: Mamba state 64, 3x3 conv only, 12-band groups, "
                         "150 epochs, AUC checked every epoch")
@@ -114,7 +116,7 @@ if __name__ == "__main__":
     a = p.parse_args()
     datasets = list(DATASETS) if a.dataset == "all" else [a.dataset]
     fusions = ["gated", "add", "spatial", "spectral"] if a.fusion == "all" else [a.fusion]
-    kw = dict(epochs=a.epochs, eval_every=a.eval_every)
+    kw = dict(epochs=a.epochs, eval_every=a.eval_every, d_state=a.d_state)
     if a.official:
         kw.update(OFFICIAL)
     for d in datasets:

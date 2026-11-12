@@ -211,7 +211,9 @@ class DMS2FHAD(nn.Module):
     """fusion: 'gated' (paper), 'add' (addition fusion), 'spatial' or 'spectral' (single branch).
     The last three are used for the ablation study (paper Table 5)."""
 
-    def __init__(self, in_bands, dim=64, group_size=16, group_stride=8, d_state=16, fusion="gated", conv5=True):
+    # Paper text: c1 = 64, c2 = 16, k = 8, 3x3 + 5x5 convs. The paper does not state the Mamba state size, so we use
+    # the official code's value, 64.
+    def __init__(self, in_bands, dim=64, group_size=16, group_stride=8, d_state=64, fusion="gated", conv5=True):
         super().__init__()
         self.fusion = fusion
         self.in_head = nn.Sequential(nn.Conv2d(in_bands, dim, 1), nn.BatchNorm2d(dim), nn.GELU())
