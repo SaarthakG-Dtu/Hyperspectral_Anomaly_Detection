@@ -88,11 +88,13 @@ def fig_datasets(res):
     save(fig, "fig_datasets.png")
 
 
-def fig3_anomaly_maps(res):
+def fig3_anomaly_maps(res, wide=False):
+    """Paper Fig. 3 layout. wide=True: vertical colour bar on the right (fits a 16:9 slide better)."""
     methods = ["RX", "Spectral only", "Spatial only", "Addition fusion", "DMS2F-HAD"]
     methods = [m for m in methods if m in methods_present(res)]
     cols = ["False colour"] + methods + ["Ground truth"]
-    fig, ax = plt.subplots(len(res), len(cols), figsize=(1.75 * len(cols), 1.8 * len(res) + 0.6))
+    size = (1.75 * len(cols) + 0.9, 1.75 * len(res) + 0.45) if wide else (1.75 * len(cols), 1.8 * len(res) + 0.6)
+    fig, ax = plt.subplots(len(res), len(cols), figsize=size)
     for i, (d, r) in enumerate(res.items()):
         for j, c in enumerate(cols):
             a = ax[i, j]
@@ -112,6 +114,15 @@ def fig3_anomaly_maps(res):
                 a.set_title(c, fontsize=8.5, fontweight="bold")
             if j == 0:
                 a.set_ylabel(DATASETS[d], fontsize=9, fontweight="bold")
+    if wide:
+        fig.subplots_adjust(top=0.93, bottom=0.01, left=0.03, right=0.9, wspace=0.05, hspace=0.06)
+        cax = fig.add_axes([0.92, 0.2, 0.013, 0.6])
+        cb = fig.colorbar(im, cax=cax, ticks=[0, 0.2, 0.4, 0.6, 0.8, 1])
+        cb.ax.tick_params(labelsize=7)
+        fig.text(0.926, 0.83, "Anomaly\npresent", ha="center", va="bottom", fontsize=8)
+        fig.text(0.926, 0.17, "Anomaly\nabsent", ha="center", va="top", fontsize=8)
+        save(fig, "fig3_anomaly_maps_wide.png")
+        return
     fig.subplots_adjust(top=0.86, bottom=0.03, wspace=0.05, hspace=0.08)
     cax = fig.add_axes([0.35, 0.94, 0.3, 0.018])
     cb = fig.colorbar(im, cax=cax, orientation="horizontal", ticks=[0, 0.2, 0.4, 0.6, 0.8, 1])
@@ -126,7 +137,7 @@ def fig3_anomaly_maps(res):
 def fig4_boxplots(res):
     methods = [m for m in ["RX", "Spectral only", "Spatial only", "Addition fusion", "DMS2F-HAD"]
                if m in methods_present(res)]
-    fig, axs = plt.subplots(1, len(res), figsize=(3.6 * len(res), 4.0), sharey=True)
+    fig, axs = plt.subplots(1, len(res), figsize=(3.6 * len(res), 4.8), sharey=True)
     for a, (d, r) in zip(axs, res.items()):
         gt = r["gt"].ravel().astype(bool)
         for k, m in enumerate(methods):
@@ -154,9 +165,14 @@ def fig4_boxplots(res):
     save(fig, "fig4_boxplots.png")
 
 
-def fig5_roc(res):
+def fig5_roc(res, grid=False):
+    """Paper Fig. 5. grid=True: 2 x 2 layout (used on the slide)."""
     methods = methods_present(res)
-    fig, axs = plt.subplots(1, len(res), figsize=(3.4 * len(res), 3.8), sharey=True)
+    if grid:
+        fig, axs = plt.subplots(2, 2, figsize=(7.6, 7.0), sharex=True, sharey=True)
+        axs = axs.ravel()
+    else:
+        fig, axs = plt.subplots(1, len(res), figsize=(3.4 * len(res), 3.8), sharey=True)
     for a, (d, r) in zip(axs, res.items()):
         for m in reversed([m for m in methods if m in r["maps"]]):   # draw ours last (on top)
             fpr, tpr = roc(r["maps"][m], r["gt"])
@@ -164,11 +180,20 @@ def fig5_roc(res):
                    label=f"{m} ({auc_score(r['maps'][m], r['gt']):.4f})")
         a.plot([0, 1], [0, 1], color=MUTED, lw=0.8, ls=":")
         a.set_title(DATASETS[d], fontweight="bold")
-        a.set_xlabel("False positive rate")
         a.grid(alpha=0.3)
         h, l = a.get_legend_handles_labels()
         a.legend(h[::-1], l[::-1], loc="lower right", fontsize=6.5, frameon=False, title="Method (AUC)",
                  title_fontsize=6.5)
+    if grid:
+        for a in axs[2:]:
+            a.set_xlabel("False positive rate")
+        for a in axs[::2]:
+            a.set_ylabel("True positive rate")
+        fig.tight_layout()
+        save(fig, "fig5_roc_grid.png")
+        return
+    for a in axs:
+        a.set_xlabel("False positive rate")
     axs[0].set_ylabel("True positive rate")
     save(fig, "fig5_roc.png")
 
@@ -417,8 +442,10 @@ if __name__ == "__main__":
     fig_spectra()
     fig_datasets(res)
     fig3_anomaly_maps(res)
+    fig3_anomaly_maps(res, wide=True)
     fig4_boxplots(res)
     fig5_roc(res)
+    fig5_roc(res, grid=True)
     tables(res)
     fig_auc_vs_paper(res)
     fig_training_curves(res)
