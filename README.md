@@ -9,7 +9,8 @@ A simple, self-contained PyTorch implementation of
 The repository contains the code, the four benchmark scenes, every result (anomaly maps, metrics, logs),
 paper-style figures, and a slide deck that explains hyperspectral anomaly detection, the datasets and the method.
 
-📊 **Presentation:** [`presentation/DMS2F-HAD_presentation.pptx`](presentation/DMS2F-HAD_presentation.pptx) (20 slides with speaker notes)
+📊 **Presentation:** [`presentation/DMS2F-HAD_presentation.pptx`](presentation/DMS2F-HAD_presentation.pptx) (24 slides with speaker notes:
+hyperspectral imaging, HAD in general, the method, datasets, comparison with other models, our results)
 
 ---
 
@@ -104,6 +105,28 @@ the official code keeps the checkpoint with the highest AUC against the ground t
 every 5 epochs) in the *best epoch* column. Because that uses labels to choose the checkpoint, we also report the
 model after all 100 epochs. The AUC fluctuates during training even while the loss keeps falling: once the
 background is learned, the decoder starts to reconstruct the anomalies too. See the training curves below.
+
+### How DMS2F-HAD compares with other models (paper's numbers)
+
+The paper benchmarks against six published detectors on 14 scenes (Tables 2–3) and against the other Mamba
+detector, MMR-HAD, on four shared scenes (Table 4). Only RX was re-run here; the other values are as reported.
+
+| Model | Type | Mean AUC (14 scenes) | Mean inference (s, A100) | Params |
+|---|---|---|---|---|
+| RX (1990) | statistical | 0.9523 | – | – |
+| AUTO-AD (TGRS 2022) | fully convolutional autoencoder | 0.9189 | 9.32 | 3.23 M |
+| LREN (AAAI 2021) | low-rank embedded autoencoder | 0.8297 | – | 0.86 M |
+| RGAE (TGRS 2022) | robust graph autoencoder | 0.9326 | – | – |
+| TDD (TGRS 2024) | transferred direct detector | 0.5900 | 2.55 | 46.64 M |
+| GT-HAD (TNNLS 2025) | gated Transformer | 0.9774 | 36.26 | 0.26 M |
+| **DMS2F-HAD (WACV 2026)** | **dual-branch Mamba** | **0.9878** | **0.555** | **0.64 M** |
+
+DMS2F-HAD is best on 9 of the 14 scenes and 4.6× faster than the next fastest model (TDD). Against MMR-HAD
+(2.12 M params, 3.5 GFLOPs) each model wins two of four shared scenes, with DMS2F-HAD using 3.3× fewer parameters
+and 29× fewer FLOPs (0.12 GFLOPs).
+
+On the four scenes used here, our own run is compared with all baselines in the slide deck (slide
+"Our reproduction vs. the baselines").
 
 ### Colour anomaly maps (paper Fig. 3)
 ![anomaly maps](results/figures/fig3_anomaly_maps.png)
