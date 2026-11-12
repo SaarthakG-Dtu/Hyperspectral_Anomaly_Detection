@@ -15,3 +15,8 @@
   epoch  70  loss 0.00135  AUC 0.9996  (1136s)
   epoch  75  loss 0.00171  AUC 0.9959  (1333s)
   epoch  80  loss 0.00153  AUC 0.9925  (1628s)
+  epoch  85  loss 0.00151  AUC 0.9964  (1892s)
+  epoch  90  loss 0.00157  AUC 0.9975  (2157s)
+  epoch  95  loss 0.00151  AUC 0.3664  (2418s)
+  epoch 100  loss 0.00149  AUC 0.9997  (2696s)
+[Cri | add] final AUC 0.9997 | best AUC 0.9999 (epoch 40) | inference 4.583s -> E:\HAD Project\results\runs\Cri_add.npz

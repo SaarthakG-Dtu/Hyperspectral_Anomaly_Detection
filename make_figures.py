@@ -336,6 +336,18 @@ def per_dataset(res):
         save(fig, f"{d}_result.png")
 
 
+def fig_thumbs(res):
+    """One square thumbnail per scene: false colour with the ground-truth anomalies outlined in red."""
+    for d, r in res.items():
+        fig, a = plt.subplots(figsize=(2.2, 2.2))
+        a.imshow(false_color(r["cube"]))
+        a.contour(r["gt"], levels=[0.5], colors="#ff2d2d", linewidths=1.1)
+        clean(a)
+        fig.subplots_adjust(0, 0, 1, 1)
+        fig.savefig(FIGS / f"thumb_{d}.png", dpi=200)
+        plt.close(fig)
+
+
 def fig_hsi_cube(d="San_Diego", out=None, dark=False):
     """Illustration of a hyperspectral cube: image on top, spectra along the sides."""
     cube, _ = load_hsi(d)
@@ -483,6 +495,7 @@ if __name__ == "__main__":
     fig_hsi_cube(out=ROOT / "presentation" / "assets" / "hsi_cube_dark.png", dark=True)
     fig_spectra()
     fig_datasets(res)
+    fig_thumbs(res)
     fig3_anomaly_maps(res)
     fig3_anomaly_maps(res, wide=True)
     fig4_boxplots(res)

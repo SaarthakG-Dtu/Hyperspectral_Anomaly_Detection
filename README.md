@@ -9,8 +9,9 @@ A simple, self-contained PyTorch implementation of
 The repository contains the code, the four benchmark scenes, every result (anomaly maps, metrics, logs),
 paper-style figures, and a slide deck that explains hyperspectral anomaly detection, the datasets and the method.
 
-📊 **Presentation:** [`presentation/DMS2F-HAD_presentation.pptx`](presentation/DMS2F-HAD_presentation.pptx) (24 slides with speaker notes:
-hyperspectral imaging, HAD in general, the method, datasets, comparison with other models, our results)
+📊 **Presentation:** [`presentation/DMS2F-HAD_presentation.pptx`](presentation/DMS2F-HAD_presentation.pptx) (15 slides with speaker notes:
+hyperspectral imaging and HAD in general, the method, the datasets and their use cases, the models it is compared
+with, our results, and why they differ from the paper)
 
 ---
 
@@ -56,19 +57,39 @@ and B, C depend on the input. It models long sequences in **linear time**, unlik
 
 ## 3. Datasets
 
-The four scenes released with the official code (`data/*.mat`, keys `data` = cube, `map` = ground truth):
+The four scenes released with the official code are in `data/*.mat` (key `data` holds the cube and key `map` the
+ground-truth mask). Object counts and sizes below were measured from the masks.
 
-| Scene | Size (H×W×C) | Sensor | Anomalies | Anomaly pixels |
+| | CRI | AVIRIS-1 | AVIRIS-2 | San Diego |
 |---|---|---|---|---|
-| CRI | 400×400×46 | Nuance CRI | 10 rocks in grassland | 860 (0.54 %) |
-| AVIRIS-1 | 100×100×189 | AVIRIS | 3 planes | 64 (0.64 %) |
-| AVIRIS-2 | 128×128×189 | AVIRIS | 3 planes | 120 (0.73 %) |
-| San Diego | 100×100×189 | AVIRIS | 3 planes | 134 (1.34 %) |
+| Sensor | Nuance CRI tunable-filter camera | AVIRIS (NASA/JPL), airborne | AVIRIS (NASA/JPL), airborne | AVIRIS (NASA/JPL), airborne |
+| Scene | grassland with rocks | airport with planes | airport with planes | airport with planes |
+| Size (H × W × bands) | 400 × 400 × 46 | 100 × 100 × 189 | 128 × 128 × 189 | 100 × 100 × 189 |
+| Spectral range | 650–1100 nm, 10 nm steps | 370–2510 nm; 189 of 224 bands kept | 370–2510 nm; 189 of 224 bands kept | 370–2510 nm; 189 of 224 bands kept |
+| Pixel size | not reported | 3.5 m | 3.5 m | 3.5 m |
+| Anomalies | 10 rocks, 15–180 px each | 3 planes, 20–22 px each | 3 planes, 34–44 px each | 3 planes, 38–56 px each |
+| Anomaly pixels | 860 (0.54 %) | 64 (0.64 %) | 120 (0.73 %) | 134 (1.34 %) |
+
+AVIRIS bands that are affected by water absorption or noise are removed in the released files. AVIRIS-2 and San
+Diego come from the same flight: 7,951 of San Diego's 10,000 pixel spectra also appear in AVIRIS-2, but each scene has
+its own crop and its own ground-truth mask. AVIRIS-1 shares no pixels with the other two.
+
+**What each scene is used for, and why it is hard**
+
+* **CRI** stands for finding small natural objects, such as rocks or debris, on vegetated ground, as in search and
+  rescue. The grass texture is strong, the bands cover only red and near-infrared light, and with 160,000 pixels it is
+  also the largest image, which tests speed and memory.
+* **AVIRIS-1** stands for airborne surveillance of an airfield. Its three planes are tiny (about 20 pixels each) and
+  dark against a bright apron, which is why RX scores only 0.8866 here.
+* **AVIRIS-2** covers a larger and busier part of the airport. Buildings, roofs and vehicles also look unusual and
+  compete with the planes for the highest scores; it is the hardest scene in our runs.
+* **San Diego** is the classic HAD benchmark: three aircraft on an airport apron, imaged from the air. Bright roofs and
+  building edges cause false alarms, especially for RX.
 
 ![datasets](results/figures/fig_datasets.png)
 
-The paper evaluates on 14 scenes; the other 10 (Salinas, ABU urban/beach, Cat Island, Gulfport, Pavia, Texas
-Coast, Bay Champagne) are not in the official release, so they are not used here.
+The paper evaluates on 14 scenes; the other 10 (Salinas, ABU urban and beach scenes, Cat Island, Gulfport, Pavia,
+Texas Coast, Bay Champagne) are not in the official release, so they are not used here.
 
 ## 4. Results
 
@@ -90,14 +111,22 @@ without labels; the ground truth is used only for evaluation. Model size: **0.64
 
 | Scene | Spectral only | Spatial only | Addition fusion | Gated fusion (full) |
 |---|---|---|---|---|
+| CRI | 0.9985 (0.9997) | 0.9999 (0.9990) | 0.9999 (0.9999) | **0.9999** (0.9999) |
 | AVIRIS-1 | 0.9876 (0.9856) | 0.9855 (0.9716) | **0.9878** (0.9710) | 0.9871 (0.9891) |
 | AVIRIS-2 | 0.8634 (0.8701) | 0.9639 (0.9755) | **0.9682** (0.9999) | 0.9639 (0.9851) |
 | San Diego | 0.9225 (0.9158) | 0.9875 (0.9674) | **0.9882** (0.9532) | 0.9876 (0.9722) |
-| **Average** | 0.9245 (0.9238) | 0.9790 (0.9715) | **0.9814** (0.9747) | 0.9795 (0.9821) |
+| **Average** | 0.9430 (0.9428) | 0.9842 (0.9784) | **0.9860** (0.9810) | 0.9846 (0.9866) |
 
 Reading: the spectral branch alone is clearly the weakest variant, as in the paper. Spatial-only, addition and gated fusion are within 0.002 AUC of each other on average, so with one seed per run we could not confirm the paper's gain from the gate on these scenes.
 
-*Not finished or not run yet:* CRI / Addition fusion.
+**Why our numbers differ from the paper.** Best-epoch AUC of extra test runs on the three AVIRIS scenes: the main run, the same settings with the AUC checked every epoch for seeds 0, 1 and 2, and the official code's settings (`--official`).
+
+| Scene | Paper | Our main run | AUC checked every epoch, seeds 0 / 1 / 2 | Official settings |
+|---|---|---|---|---|
+| AVIRIS-1 | 0.9891 | 0.9871 | 0.9905 / running / running | running |
+| AVIRIS-2 | 0.9851 | 0.9639 | 0.9700 / running / running | running |
+| San Diego | 0.9722 | 0.9876 | 0.9892 / running / running | running |
+| **Mean** | 0.9821 | 0.9795 | – | – |
 <!-- RESULTS END -->
 
 **About "best epoch" vs. "epoch 100".** The paper reports "the model with the best validation performance", and
